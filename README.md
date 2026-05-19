@@ -6,8 +6,7 @@ outcome must hold; the workbench tells you whether it does.
 
 ## What it is not
 
-A green scoreboard means nothing the probe knows how to attempt got through. It does
-not mean secure. The probe battery is finite, the asset is a simulation, and the
+A green scoreboard means the probe found no path through. It does not mean secure. The probe battery is finite, the asset is a simulation, and the
 workbench teaches the shape of a decision rather than the specifics of any particular
 vendor's appliance. That distinction is worth carrying from the start.
 
