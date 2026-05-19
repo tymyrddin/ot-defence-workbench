@@ -36,9 +36,9 @@ demonstrable constraint. Later versions can swap the asset to MQTT or OPC UA.
 
 ## The component tray
 
-A defence is built by instantiating a component. Each component is a pre-built container
-image with a wiring recipe. The skill being practised is placement and composition: where
-the component sits, what it connects to, what path it replaces.
+A defence is a shell script that configures the boundary node — typically iptables rules,
+but any command the boundary container supports. Each component lives in
+`components/<name>/apply.sh`. Flushing a component resets the FORWARD chain to open.
 
 Version 1 components:
 
@@ -54,14 +54,17 @@ Version 1 components:
 
 ## The control surface
 
+The web UI at `http://localhost:5000` is the primary working surface. It shows the probe
+battery, the component tray, and editable code for both. Participants write and save rules
+and probes directly in the browser.
+
+The CLI handles infrastructure:
+
 ```
-lab up / lab down        start and stop the bench
-lab brief                print the current requirement
-lab build <component>    instantiate and wire a component
-lab remove <component>   reverse it
-lab check                run the probe battery and print the scoreboard
-lab next                 advance to the next brief
-lab reset                return the bench to flat
+./lab up      build images and start the bench
+./lab down    stop and remove all containers
+./lab reset   flush rules and clear state, bench stays up
+./lab next    advance to the next brief (also resets)
 ```
 
 ## Scoring
@@ -125,14 +128,17 @@ stays at four containers throughout; the difficulty lives in the tier, not the s
 ## Project layout
 
 ```
-topology.clab.yml              base four-node bench
-asset/                         Modbus/TCP server image
-client/                        legitimate consumer image and checks
-probe/checks/                  adversary image and check scripts
-boundary/                      boundary node image
-components/<name>/             one directory per component: image and apply/remove scripts
-briefs/<nn>-<slug>.toml        one file per brief: requirement text and expected check outcomes
-lab                            CLI
+topology.clab.yml                    base four-node bench
+asset/                               Modbus/TCP server image
+client/                              legitimate consumer image and checks
+probe/                               adversary image
+  checks/                            brief check scripts
+  custom/<protocol>/<name>.py        participant-written probes, organised by protocol
+boundary/                            boundary node image
+components/<name>/apply.sh           one directory per component, one apply script each
+briefs/<nn>-<slug>.toml              one file per brief: requirement and expected outcomes
+web/                                 Flask web UI
+lab                                  CLI (infrastructure only)
 README.md
 ```
 
@@ -144,17 +150,21 @@ workable fallback if containerlab adds friction for the component-injection step
 **Prerequisites:** Docker, [containerlab](https://containerlab.dev/install/), Python 3.11+.
 
 ```
-./lab up                   build images and start the bench
-./lab check                run the probe battery and print the scoreboard
-./lab brief                print the current requirement
-./lab build <component>    instantiate and wire a component
-./lab remove <component>   reverse it
-./lab next                 advance to the next brief
-./lab reset                return the bench to flat
-./lab down                 stop and remove all containers
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+./lab up
+.venv/bin/python web/app.py
 ```
 
-Add the project directory to `PATH` to drop the `./` prefix.
+Open `http://localhost:5000`.
+
+The web UI is the working surface: probe battery with editable check scripts organised by
+protocol, component tray with editable apply scripts, results table. Participants write
+defences and custom probes directly in the browser and save them back to disk.
+
+`probe/custom/<protocol>/` holds participant-written probes. `_template.py` is the
+starting point. Custom probes appear in the web UI under their protocol tab and run
+alongside brief checks when the probe battery fires.
 
 ## The smallest first slice
 

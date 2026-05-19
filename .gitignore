@@ -1,4 +1,5 @@
 .current-brief
+.last-results.json
 .applied-components
 .venv/
 .idea/

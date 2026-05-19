@@ -138,6 +138,103 @@ def cmd_remove(args):
     print(f"removed: {component}")
 
 
+def _run_custom_probes():
+    custom_dir = LAB_DIR / "probe" / "custom"
+    scripts = sorted(
+        p for p in custom_dir.iterdir()
+        if p.suffix in (".py", ".sh") and not p.name.startswith("_")
+    ) if custom_dir.exists() else []
+
+    results = []
+    for script in scripts:
+        dest = f"/tmp/custom-{script.name}"
+        subprocess.run(
+            ["docker", "cp", str(script), f"{PROBE}:{dest}"],
+            capture_output=True,
+        )
+        cmd = ["python3", dest] if script.suffix == ".py" else ["/bin/sh", dest]
+        rc = docker_exec(PROBE, cmd, capture=True)
+        results.append({"name": script.name, "actual": "pass" if rc == 0 else "block"})
+    return results
+
+
+_PROBE_TEMPLATE = """\
+#!/usr/bin/env python3
+# {name}: describe what this probe checks.
+# Exit 0 = reached/succeeded (pass).  Exit 1 = blocked/failed (block).
+import sys
+from pymodbus.client import ModbusTcpClient
+
+TARGET = "10.0.2.10"
+PORT = 502
+
+client = ModbusTcpClient(TARGET, port=PORT, timeout=2)
+if not client.connect():
+    sys.exit(1)
+
+# Replace with the operation you want to test.
+result = client.read_holding_registers(0, 1)
+client.close()
+
+sys.exit(0 if not result.isError() else 1)
+"""
+
+
+def cmd_probe(args):
+    if args and args[0] == "add":
+        if len(args) < 2:
+            sys.exit("Usage: lab probe add <name>")
+        name = args[1]
+        custom_dir = LAB_DIR / "probe" / "custom"
+        custom_dir.mkdir(exist_ok=True)
+        dest = custom_dir / f"{name}.py"
+        if dest.exists():
+            sys.exit(f"Already exists: {dest}")
+        dest.write_text(_PROBE_TEMPLATE.format(name=name))
+        dest.chmod(0o755)
+        print(f"Created {dest.relative_to(LAB_DIR)} — edit it, then run ./lab check.")
+        return
+
+    brief = load_brief()
+    if not brief:
+        print("No brief loaded.")
+        return
+    b = brief["brief"]
+    checks = brief.get("checks", [])
+
+    RUNNER_DIR = {"probe": LAB_DIR / "probe", "client": LAB_DIR / "client"}
+
+    print(f"\nbrief {b['number']} · {b['slug']} — probe battery\n")
+    for check in checks:
+        runner = check["runner"]
+        name = check["name"]
+        script_name = Path(check["script"]).name
+        src = RUNNER_DIR[runner] / "checks" / script_name
+        print(f"  [{runner}]  {name}  ({check['script']})")
+        print()
+        if src.exists():
+            for line in src.read_text().splitlines():
+                print(f"    {line}")
+        else:
+            print("    (source not found)")
+        print()
+
+    custom_dir = LAB_DIR / "probe" / "custom"
+    if custom_dir.exists():
+        custom = sorted(
+            p for p in custom_dir.iterdir()
+            if p.suffix in (".py", ".sh") and not p.name.startswith("_")
+        )
+        if custom:
+            print(f"  CUSTOM PROBES\n")
+            for script in custom:
+                print(f"  {script.name}")
+                print()
+                for line in script.read_text().splitlines():
+                    print(f"    {line}")
+                print()
+
+
 def cmd_check(_args):
     brief = load_brief()
     if not brief:
@@ -165,6 +262,8 @@ def cmd_check(_args):
              "actual": actual, "held": actual == expect}
         )
 
+    custom = _run_custom_probes()
+
     print(f"\nbrief {b['number']} · {b['slug']}\n")
 
     w = 26
@@ -184,6 +283,12 @@ def cmd_check(_args):
         for r in legitimate:
             mark = "+" if r["held"] else "!"
             print(f"  {r['name']:<{w-2}}  {r['expect']:<8}  {r['actual']:<8}  {mark}")
+
+    if custom:
+        print()
+        print(f"{'CUSTOM PROBES':<{w}}  {'RESULT':<8}")
+        for r in custom:
+            print(f"  {r['name']:<{w-2}}  {r['actual']:<8}")
 
     print()
     all_held = all(r["held"] for r in results)
@@ -224,6 +329,7 @@ COMMANDS = {
     "up": cmd_up,
     "down": cmd_down,
     "brief": cmd_brief,
+    "probe": cmd_probe,
     "build": cmd_build,
     "remove": cmd_remove,
     "check": cmd_check,

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OT Defence Workbench</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+</head>
+<body>
+
+<nav class="navbar px-3 py-2">
+  <span class="navbar-brand">OT Defence Workbench</span>
+  {% if brief %}<span class="text-muted small">brief {{ brief.brief.number }} · {{ brief.brief.slug }}</span>{% endif %}
+  <div class="ms-auto d-flex gap-2 align-items-center">
+    {% if headline %}
+    <span class="badge {% if headline == 'HELD' %}bg-success{% else %}bg-danger{% endif %} fs-6">{{ headline }}</span>
+    {% endif %}
+    <form action="/reset" method="post" class="mb-0">
+      <button class="btn btn-sm btn-outline-secondary">Reset bench</button>
+    </form>
+    <form action="/next" method="post" class="mb-0">
+      <button class="btn btn-sm btn-outline-info">Next brief →</button>
+    </form>
+  </div>
+</nav>
+
+<div class="container-fluid py-3 px-4">
+
+  {% with messages = get_flashed_messages() %}{% if messages %}
+  <div class="alert alert-warning py-2">{{ messages[0] }}</div>
+  {% endif %}{% endwith %}
+
+  {% if brief %}
+  <div class="brief-bar rounded p-3 mb-3">
+    <strong class="text-light">{{ brief.brief.title }}</strong>
+    <div class="text-muted small mt-1">
+      {{ brief.brief.requirement.strip().split('\n')[0] }}
+      <a href="#" class="text-secondary" onclick="this.nextElementSibling.classList.toggle('d-none');return false;"> more</a>
+    </div>
+    <pre class="text-secondary small mt-2 d-none">{{ brief.brief.requirement.strip() }}</pre>
+  </div>
+  {% endif %}
+
+  <div class="row g-4">
+
+    <!-- ── PROBE BATTERY ── -->
+    <div class="col-xl-6 col-12">
+      <div class="pane-header">Probe Battery
+        <span class="text-muted small ms-2">code is editable — save as probe to keep changes</span>
+      </div>
+
+      <ul class="nav proto-tabs" id="probeTabList">
+        {% for proto in all_protocols %}
+        {% set has_content = proto in checks_by_protocol or proto in custom_probes %}
+        <li class="nav-item">
+          <a class="nav-link {% if loop.first %}active{% endif %} {% if not has_content %}empty{% endif %}"
+             data-bs-toggle="tab" href="#tab-{{ proto }}">{{ proto }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+
+      <form id="checkForm" action="/check" method="post">
+      <div class="tab-content">
+        {% for proto in all_protocols %}
+        {% set brief_checks = checks_by_protocol.get(proto, []) %}
+        {% set custom_list = custom_probes.get(proto, []) %}
+        <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="tab-{{ proto }}">
+
+          {% if brief_checks %}
+          <div class="section-label">Brief checks</div>
+          {% for check in brief_checks %}
+          <div class="probe-item">
+            <div class="item-meta">
+              <input class="form-check-input flex-shrink-0" type="checkbox"
+                     name="brief_probes" value="{{ check.name }}" checked>
+              <strong class="item-label">{{ check.name }}</strong>
+              <span class="badge-runner">{{ check.runner }}</span>
+              <span class="text-muted small ms-auto">expects <em>{{ check.expect }}</em></span>
+            </div>
+            <textarea class="code-editor">{{ check.source }}</textarea>
+            <div class="item-actions">
+              <input type="text" class="form-control form-control-sm input-dark save-name"
+                     value="{{ check.name }}" placeholder="save as...">
+              <input type="hidden" class="save-protocol" value="{{ proto }}">
+              <button type="button" class="btn btn-sm btn-outline-secondary"
+                      onclick="saveProbe(this)">Save as probe</button>
+            </div>
+          </div>
+          {% endfor %}
+          {% endif %}
+
+          {% if custom_list %}
+          <div class="section-label">Custom probes</div>
+          {% for probe in custom_list %}
+          <div class="probe-item">
+            <div class="item-meta">
+              <input class="form-check-input flex-shrink-0" type="checkbox"
+                     name="custom_probes" value="{{ probe.protocol }}/{{ probe.name }}" checked>
+              <strong class="item-label">{{ probe.name }}</strong>
+              <form action="/probe/delete/{{ probe.protocol }}/{{ probe.name }}" method="post" class="ms-auto mb-0">
+                <button type="submit" class="btn-icon" title="delete">✕</button>
+              </form>
+            </div>
+            <textarea class="code-editor">{{ probe.source }}</textarea>
+            <div class="item-actions">
+              <input type="text" class="form-control form-control-sm input-dark save-name"
+                     value="{{ probe.name }}" placeholder="save as...">
+              <input type="hidden" class="save-protocol" value="{{ proto }}">
+              <button type="button" class="btn btn-sm btn-outline-secondary"
+                      onclick="saveProbe(this)">Save</button>
+            </div>
+          </div>
+          {% endfor %}
+          {% endif %}
+
+          <div class="section-label">New {{ proto }} probe</div>
+          <div class="probe-item">
+            <textarea class="code-editor">{{ probe_template }}</textarea>
+            <div class="item-actions">
+              <input type="text" class="form-control form-control-sm input-dark save-name"
+                     value="" placeholder="probe-name (required)">
+              <input type="hidden" class="save-protocol" value="{{ proto }}">
+              <button type="button" class="btn btn-sm btn-outline-primary"
+                      onclick="saveProbe(this)">+ Save probe</button>
+            </div>
+          </div>
+
+        </div>
+        {% endfor %}
+      </div>
+      <button type="submit" class="btn btn-success w-100 mt-3">▶ Run selected checks</button>
+      </form>
+    </div>
+
+    <!-- ── COMPONENT TRAY ── -->
+    <div class="col-xl-6 col-12">
+      <div class="pane-header">Component Tray
+        <span class="text-muted small ms-2">write rules, save, build</span>
+      </div>
+
+      <form action="/build" method="post">
+        <div class="section-label">Available components</div>
+        {% for comp in components %}
+        <div class="probe-item {% if comp.name in applied %}applied{% endif %}">
+          <div class="item-meta">
+            <input class="form-check-input flex-shrink-0" type="radio"
+                   name="component" value="{{ comp.name }}" id="c-{{ comp.name }}"
+                   {% if comp.name in applied %}checked{% endif %}>
+            <label class="form-check-label item-label" for="c-{{ comp.name }}"><strong>{{ comp.name }}</strong></label>
+            {% if comp.name in applied %}<span class="badge bg-success small">applied</span>{% endif %}
+            <div class="ms-auto d-flex gap-2 align-items-center">
+              {% if comp.name in applied %}
+              <form action="/remove/{{ comp.name }}" method="post" class="mb-0">
+                <button type="submit" class="btn btn-sm btn-outline-warning py-0 px-2">Flush</button>
+              </form>
+              {% endif %}
+              {% if comp.name not in ['packet-filter'] %}
+              <form action="/defence/delete/{{ comp.name }}" method="post" class="mb-0">
+                <button type="submit" class="btn-icon" title="delete">✕</button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+          {% if comp.description %}<div class="text-muted small mb-2">{{ comp.description }}</div>{% endif %}
+          <textarea class="code-editor">{{ comp.apply }}</textarea>
+          <div class="item-actions">
+            <input type="text" class="form-control form-control-sm input-dark save-name"
+                   value="{{ comp.name }}" placeholder="save as...">
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    onclick="saveDefence(this)">Save as defence</button>
+          </div>
+        </div>
+        {% endfor %}
+        <div class="mt-3">
+          <button type="submit" class="btn btn-primary btn-sm">⚙ Build selected</button>
+        </div>
+      </form>
+
+      <div class="section-label mt-3">New defence</div>
+      <div class="probe-item">
+        <textarea class="code-editor">{{ default_apply }}</textarea>
+        <div class="item-actions">
+          <input type="text" class="form-control form-control-sm input-dark save-name"
+                 value="" placeholder="defence-name (required)">
+          <button type="button" class="btn btn-sm btn-outline-primary"
+                  onclick="saveDefence(this)">+ Save defence</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── RESULTS ── -->
+  {% if results %}
+  <div class="pane-header mt-4 d-flex align-items-center">
+    Results
+    <span class="badge {% if headline == 'HELD' %}bg-success{% else %}bg-danger{% endif %} ms-3">
+      HEADLINE: {{ headline }}
+    </span>
+  </div>
+  <div class="mt-2">
+    <table class="table table-sm results-table mb-0">
+      <thead><tr><th>check</th><th>runner</th><th>protocol</th><th>expect</th><th>result</th><th></th></tr></thead>
+      <tbody>
+        {% set adversary = results | selectattr("runner", "eq", "probe") | rejectattr("custom") | list %}
+        {% set legitimate = results | selectattr("runner", "eq", "client") | rejectattr("custom") | list %}
+        {% set custom_results = results | selectattr("custom") | list %}
+        {% if adversary %}
+        <tr class="group-header"><td colspan="6">ADVERSARY</td></tr>
+        {% for r in adversary %}
+        <tr class="{{ 'row-held' if r.held else 'row-open' }}">
+          <td>{{ r.name }}</td><td>{{ r.runner }}</td><td>{{ r.get('protocol','') }}</td>
+          <td>{{ r.expect }}</td><td>{{ r.actual }}</td><td>{{ '+' if r.held else '!' }}</td>
+        </tr>{% endfor %}{% endif %}
+        {% if legitimate %}
+        <tr class="group-header"><td colspan="6">LEGITIMATE</td></tr>
+        {% for r in legitimate %}
+        <tr class="{{ 'row-held' if r.held else 'row-open' }}">
+          <td>{{ r.name }}</td><td>{{ r.runner }}</td><td>{{ r.get('protocol','') }}</td>
+          <td>{{ r.expect }}</td><td>{{ r.actual }}</td><td>{{ '+' if r.held else '!' }}</td>
+        </tr>{% endfor %}{% endif %}
+        {% if custom_results %}
+        <tr class="group-header"><td colspan="6">CUSTOM PROBES</td></tr>
+        {% for r in custom_results %}
+        <tr class="row-custom">
+          <td>{{ r.name }}</td><td>{{ r.runner }}</td><td>{{ r.get('protocol','') }}</td>
+          <td>—</td><td>{{ r.actual }}</td><td></td>
+        </tr>{% endfor %}{% endif %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  function saveProbe(btn) {
+    const item = btn.closest(".probe-item");
+    const name = item.querySelector(".save-name").value.trim();
+    const protocol = item.querySelector(".save-protocol").value.trim() || "modbus";
+    if (!name) { alert("Give the probe a name."); return; }
+    const ta = item.querySelector("textarea.code-editor");
+    post("/probe/save", { name, protocol, code: ta ? ta.value : "" });
+  }
+
+  function saveDefence(btn) {
+    const item = btn.closest(".probe-item");
+    const name = item.querySelector(".save-name").value.trim();
+    if (!name) { alert("Give the defence a name."); return; }
+    const ta = item.querySelector("textarea.code-editor");
+    post("/defence/save", { name, apply_code: ta ? ta.value : "" });
+  }
+
+  function post(action, fields) {
+    const f = document.createElement("form");
+    f.method = "post"; f.action = action;
+    Object.entries(fields).forEach(([k, v]) => {
+      const i = document.createElement("input"); i.name = k; i.value = v; f.append(i);
+    });
+    document.body.append(f); f.submit();
+  }
+</script>
+</body>
+</html>

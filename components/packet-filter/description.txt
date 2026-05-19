@@ -1,0 +1,1 @@
+L3/L4 allowlist. Default deny on FORWARD; permits named source/destination/port flows.

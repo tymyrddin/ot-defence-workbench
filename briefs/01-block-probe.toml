@@ -18,21 +18,25 @@ runner = "probe"
 name = "direct-reach"
 script = "/checks/01-direct-reach.py"
 expect = "block"
+protocol = "modbus"
 
 [[checks]]
 runner = "probe"
 name = "anon-read"
 script = "/checks/02-anon-read.py"
 expect = "block"
+protocol = "modbus"
 
 [[checks]]
 runner = "probe"
 name = "write-attempt"
 script = "/checks/03-write-attempt.py"
 expect = "block"
+protocol = "modbus"
 
 [[checks]]
 runner = "client"
 name = "client-read"
 script = "/checks/01-client-read.py"
 expect = "pass"
+protocol = "modbus"
