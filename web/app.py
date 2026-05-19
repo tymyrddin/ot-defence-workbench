@@ -175,6 +175,14 @@ def index():
         set(list(checks_by_protocol.keys()) + list(custom_probes.keys()))
     )
 
+    applied_names = applied
+    # Which editor to show: URL param > applied > first component
+    show_comp = (
+        request.args.get("comp")
+        or next(iter(applied_names), None)
+        or (components[0]["name"] if components else None)
+    )
+
     return render_template(
         "index.html",
         brief=brief,
@@ -183,12 +191,12 @@ def index():
         active_protocols=active_protocols,
         all_protocols=PROTOCOLS,
         components=components,
-        applied=applied,
+        applied=applied_names,
+        show_comp=show_comp,
         results=results,
         headline=headline,
         probe_template=get_probe_template(),
         default_apply=DEFAULT_APPLY,
-        default_remove=DEFAULT_REMOVE,
     )
 
 
@@ -209,6 +217,7 @@ def check():
         actual = "pass" if rc == 0 else "block"
         results.append({
             "name": chk["name"], "runner": chk["runner"],
+            "protocol": chk.get("protocol", ""),
             "expect": chk["expect"], "actual": actual,
             "held": actual == chk["expect"], "custom": False,
         })
@@ -239,6 +248,63 @@ def check():
     return redirect(url_for("index"))
 
 
+def _flush_applied():
+    for name in list(get_applied()):
+        remove_sh = LAB_DIR / "components" / name / "remove.sh"
+        if remove_sh.exists():
+            subprocess.run(
+                ["docker", "cp", str(remove_sh), f"{BOUNDARY}:/tmp/component-remove.sh"],
+                capture_output=True,
+            )
+            subprocess.run(["docker", "exec", BOUNDARY, "/bin/sh", "/tmp/component-remove.sh"])
+    APPLIED_FILE.write_text("")
+
+
+def _write_script(path, code):
+    """Write shell script with Unix line endings."""
+    path.write_text(code.replace('\r\n', '\n').replace('\r', '\n'))
+    path.chmod(0o755)
+
+
+@app.route("/apply-component/<name>", methods=["POST"])
+def apply_component(name):
+    """Apply a saved component by name, flushing whatever is current."""
+    apply_sh = LAB_DIR / "components" / name / "apply.sh"
+    if not apply_sh.exists():
+        flash(f"No apply.sh for: {name}")
+        return redirect(url_for("index"))
+    _flush_applied()
+    subprocess.run(
+        ["docker", "cp", str(apply_sh), f"{BOUNDARY}:/tmp/component-apply.sh"], check=True
+    )
+    subprocess.run(["docker", "exec", BOUNDARY, "/bin/sh", "/tmp/component-apply.sh"])
+    APPLIED_FILE.write_text(name)
+    return redirect(url_for("index"))
+
+
+@app.route("/build-and-apply", methods=["POST"])
+def build_and_apply():
+    name = request.form.get("name", "").strip()
+    apply_code = request.form.get("apply_code", "")
+    if not name:
+        flash("Give the defence a name.")
+        return redirect(url_for("index"))
+    comp_dir = LAB_DIR / "components" / name
+    comp_dir.mkdir(exist_ok=True)
+    apply_sh = comp_dir / "apply.sh"
+    _write_script(apply_sh, apply_code)
+    remove_sh = comp_dir / "remove.sh"
+    if not remove_sh.exists():
+        _write_script(remove_sh, DEFAULT_REMOVE)
+    _flush_applied()
+    subprocess.run(
+        ["docker", "cp", str(apply_sh), f"{BOUNDARY}:/tmp/component-apply.sh"], check=True
+    )
+    subprocess.run(["docker", "exec", BOUNDARY, "/bin/sh", "/tmp/component-apply.sh"])
+    APPLIED_FILE.write_text(name)
+    return redirect(url_for("index"))
+
+
 @app.route("/build", methods=["POST"])
 def build():
     component = request.form.get("component", "").strip()
@@ -249,13 +315,12 @@ def build():
     if not apply_sh.exists():
         flash(f"No apply.sh for: {component}")
         return redirect(url_for("index"))
+    _flush_applied()
     subprocess.run(
         ["docker", "cp", str(apply_sh), f"{BOUNDARY}:/tmp/component-apply.sh"], check=True
     )
     subprocess.run(["docker", "exec", BOUNDARY, "/bin/sh", "/tmp/component-apply.sh"])
-    applied = get_applied()
-    applied.add(component)
-    APPLIED_FILE.write_text("\n".join(sorted(applied)))
+    APPLIED_FILE.write_text(component)
     return redirect(url_for("index"))
 
 
@@ -270,15 +335,18 @@ def remove(name):
     applied = get_applied()
     applied.discard(name)
     APPLIED_FILE.write_text("\n".join(sorted(applied)))
-    return redirect(url_for("index"))
+    return redirect(url_for("index", comp=name))
 
 
 @app.route("/reset", methods=["POST"])
 def reset():
-    subprocess.run(
+    r = subprocess.run(
         ["docker", "exec", BOUNDARY, "/bin/sh", "-c",
-         "iptables -F FORWARD && iptables -P FORWARD ACCEPT"]
+         "iptables -F FORWARD && iptables -P FORWARD ACCEPT"],
+        capture_output=True,
     )
+    if r.returncode != 0:
+        flash(f"Reset failed (is the lab running?): {r.stderr.decode().strip()}")
     APPLIED_FILE.write_text("")
     RESULTS_FILE.unlink(missing_ok=True)
     return redirect(url_for("index"))
@@ -331,12 +399,8 @@ def save_defence():
         return redirect(url_for("index"))
     comp_dir = LAB_DIR / "components" / name
     comp_dir.mkdir(exist_ok=True)
-    apply_sh = comp_dir / "apply.sh"
-    apply_sh.write_text(apply_code)
-    apply_sh.chmod(0o755)
-    remove_sh = comp_dir / "remove.sh"
-    remove_sh.write_text(DEFAULT_REMOVE)
-    remove_sh.chmod(0o755)
+    _write_script(comp_dir / "apply.sh", apply_code)
+    _write_script(comp_dir / "remove.sh", DEFAULT_REMOVE)
     return redirect(url_for("index"))
 
 

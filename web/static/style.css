@@ -21,13 +21,18 @@ body {
 .navbar { background: #161b22; border-bottom: 1px solid var(--border); }
 .navbar-brand { color: var(--text) !important; font-weight: 600; }
 
-.brief-bar { background: #161b22; border: 1px solid var(--border); }
+.brief-bar    { background: #161b22; border: 1px solid var(--border); }
+.brief-title  { color: #e6edf3; }
+.brief-text   { color: var(--text); }
+.brief-full   { color: var(--text); }
+.brief-more   { color: var(--muted); }
 
 .pane-header {
   font-weight: 600;
   padding-bottom: 8px;
   border-bottom: 2px solid var(--border);
 }
+.pane-subtitle { color: var(--muted); font-weight: 400; font-size: 0.78rem; }
 
 .section-label {
   color: var(--muted);
@@ -109,7 +114,8 @@ textarea.code-editor:focus {
   border: none;
   border-bottom: 2px solid transparent;
   border-radius: 0;
-  padding: 6px 10px;
+  padding: 4px 7px;
+  font-size: 0.78rem;
   background: transparent;
 }
 .proto-tabs .nav-link:hover { color: var(--text); }
@@ -119,6 +125,8 @@ textarea.code-editor:focus {
   border-bottom: 2px solid var(--accent);
 }
 .proto-tabs .nav-link.empty { opacity: 0.3; }
+.proto-tabs .nav-link.comp-applied { color: #3fb950; }
+.proto-tabs .nav-link.comp-applied.active { border-bottom-color: #3fb950; }
 
 .results-table { color: var(--text); font-size: 0.82rem; }
 .results-table thead th { color: var(--muted); border-color: var(--border); font-weight: 500; }
@@ -130,6 +138,44 @@ textarea.code-editor:focus {
 .row-held td { color: #3fb950; }
 .row-open td  { color: #f85149; }
 .row-custom td { color: var(--muted); }
+
+.run-section { border-top: 1px solid var(--border); padding-top: 16px; }
+.run-explainer {
+  background: #161b22;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.rules-status { font-size: 0.82rem; margin-top: 4px; }
+.status-live { color: #3fb950; }
+.status-open { color: var(--muted); }
+.editor-heading { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+.badge-live { color: #3fb950; font-size: 0.75rem; font-weight: 400; }
+
+.comp-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.comp-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.comp-btn:hover { color: var(--text); border-color: var(--text); }
+.comp-btn.is-applied { color: #3fb950; border-color: #3fb950; }
+
+.comp-editor { margin-top: 8px; }
 
 .btn-icon {
   background: none; border: none; color: var(--muted);
