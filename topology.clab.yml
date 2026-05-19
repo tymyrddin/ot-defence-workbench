@@ -29,8 +29,8 @@ topology:
       network-mode: none
 
   links:
-    - endpoints: ["client:eth1", "north:client"]
-    - endpoints: ["probe:eth1", "north:probe"]
-    - endpoints: ["boundary:eth1", "north:boundary"]
-    - endpoints: ["boundary:eth2", "south:boundary"]
-    - endpoints: ["asset:eth1", "south:asset"]
+    - endpoints: ["client:eth1", "north:veth-client"]
+    - endpoints: ["probe:eth1", "north:veth-probe"]
+    - endpoints: ["boundary:eth1", "north:veth-bnd-n"]
+    - endpoints: ["boundary:eth2", "south:veth-bnd-s"]
+    - endpoints: ["asset:eth1", "south:veth-asset"]

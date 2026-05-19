@@ -125,16 +125,36 @@ stays at four containers throughout; the difficulty lives in the tier, not the s
 ## Project layout
 
 ```
-topology.clab.yml          base four-node bench
-components/<name>/         one directory per component: image definition and wiring fragment
-briefs/<nn>-<slug>.yml     one file per brief: requirement text and expected check outcomes
-probe/checks/              adversary image and check scripts
-lab                        CLI
+topology.clab.yml              base four-node bench
+asset/                         Modbus/TCP server image
+client/                        legitimate consumer image and checks
+probe/checks/                  adversary image and check scripts
+boundary/                      boundary node image
+components/<name>/             one directory per component: image and apply/remove scripts
+briefs/<nn>-<slug>.toml        one file per brief: requirement text and expected check outcomes
+lab                            CLI
 README.md
 ```
 
 containerlab handles the two-segment topology cleanly. Plain Docker Compose is a
 workable fallback if containerlab adds friction for the component-injection step.
+
+## Running it
+
+**Prerequisites:** Docker, [containerlab](https://containerlab.dev/install/), Python 3.11+.
+
+```
+./lab up                   build images and start the bench
+./lab check                run the probe battery and print the scoreboard
+./lab brief                print the current requirement
+./lab build <component>    instantiate and wire a component
+./lab remove <component>   reverse it
+./lab next                 advance to the next brief
+./lab reset                return the bench to flat
+./lab down                 stop and remove all containers
+```
+
+Add the project directory to `PATH` to drop the `./` prefix.
 
 ## The smallest first slice
 
