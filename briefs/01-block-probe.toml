@@ -1,0 +1,38 @@
+[brief]
+number = 1
+slug = "block-probe"
+title = "Block the probe, keep the client"
+requirement = """
+The probe cannot reach the asset. The client's reads still succeed.
+
+The boundary starts as a transparent bridge — everything passes. Place a
+component that makes the boundary selective: the client's Modbus reads
+reach the asset; the probe's traffic does not.
+
+Several architectures satisfy this. The check does not ask how you did it,
+only whether the outcome holds.
+"""
+
+[[checks]]
+runner = "probe"
+name = "direct-reach"
+script = "/checks/01-direct-reach.py"
+expect = "block"
+
+[[checks]]
+runner = "probe"
+name = "anon-read"
+script = "/checks/02-anon-read.py"
+expect = "block"
+
+[[checks]]
+runner = "probe"
+name = "write-attempt"
+script = "/checks/03-write-attempt.py"
+expect = "block"
+
+[[checks]]
+runner = "client"
+name = "client-read"
+script = "/checks/01-client-read.py"
+expect = "pass"

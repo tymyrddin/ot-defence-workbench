@@ -1,0 +1,224 @@
+#!/usr/bin/env python3
+import glob
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+LAB_DIR = Path(__file__).resolve().parent
+TOPO = LAB_DIR / "topology.clab.yml"
+BRIEF_FILE = LAB_DIR / ".current-brief"
+APPLIED_FILE = LAB_DIR / ".applied-components"
+
+LAB_NAME = "ot-defence-workbench"
+BOUNDARY = f"clab-{LAB_NAME}-boundary"
+PROBE = f"clab-{LAB_NAME}-probe"
+CLIENT = f"clab-{LAB_NAME}-client"
+
+RUNNER_CONTAINER = {"probe": PROBE, "client": CLIENT}
+
+
+def current_brief_num():
+    try:
+        return int(BRIEF_FILE.read_text().strip())
+    except (FileNotFoundError, ValueError):
+        return 1
+
+
+def brief_path(n=None):
+    if n is None:
+        n = current_brief_num()
+    matches = sorted(glob.glob(str(LAB_DIR / "briefs" / f"{n:02d}-*.toml")))
+    return Path(matches[0]) if matches else None
+
+
+def load_brief(n=None):
+    p = brief_path(n)
+    if not p:
+        return None
+    with open(p, "rb") as f:
+        return tomllib.load(f)
+
+
+def docker_exec(container, cmd, capture=False):
+    full = ["docker", "exec", container] + cmd
+    if capture:
+        r = subprocess.run(full, capture_output=True)
+        return r.returncode
+    return subprocess.run(full).returncode
+
+
+def cmd_up(_args):
+    for service in ("asset", "client", "probe", "boundary"):
+        subprocess.run(
+            ["docker", "build", "-t", f"ot-workbench/{service}:latest",
+             str(LAB_DIR / service)],
+            check=True,
+        )
+    subprocess.run(["clab", "deploy", "-t", str(TOPO)], check=True)
+
+
+def cmd_down(_args):
+    subprocess.run(["clab", "destroy", "-t", str(TOPO)])
+
+
+def cmd_brief(_args):
+    brief = load_brief()
+    if not brief:
+        print("No brief found.")
+        return
+    b = brief["brief"]
+    print(f"\nbrief {b['number']} · {b['slug']}\n")
+    print(b["title"])
+    print()
+    print(b["requirement"].strip())
+    print()
+
+
+def cmd_build(args):
+    if not args:
+        sys.exit("Usage: lab build <component>")
+    component = args[0]
+    comp_dir = LAB_DIR / "components" / component
+    apply_script = comp_dir / "apply.sh"
+    if not apply_script.exists():
+        sys.exit(f"No apply.sh for component: {component}")
+    subprocess.run(
+        ["docker", "cp", str(apply_script), f"{BOUNDARY}:/tmp/component-apply.sh"],
+        check=True,
+    )
+    rc = docker_exec(BOUNDARY, ["/bin/sh", "/tmp/component-apply.sh"])
+    if rc != 0:
+        sys.exit(f"Failed to build: {component}")
+    applied = set(APPLIED_FILE.read_text().splitlines()) if APPLIED_FILE.exists() else set()
+    applied.add(component)
+    APPLIED_FILE.write_text("\n".join(sorted(applied)))
+    print(f"built: {component}")
+
+
+def cmd_remove(args):
+    if not args:
+        sys.exit("Usage: lab remove <component>")
+    component = args[0]
+    comp_dir = LAB_DIR / "components" / component
+    remove_script = comp_dir / "remove.sh"
+    if not remove_script.exists():
+        sys.exit(f"No remove.sh for component: {component}")
+    subprocess.run(
+        ["docker", "cp", str(remove_script), f"{BOUNDARY}:/tmp/component-remove.sh"],
+        check=True,
+    )
+    rc = docker_exec(BOUNDARY, ["/bin/sh", "/tmp/component-remove.sh"])
+    if rc != 0:
+        sys.exit(f"Failed to remove: {component}")
+    if APPLIED_FILE.exists():
+        applied = set(APPLIED_FILE.read_text().splitlines())
+        applied.discard(component)
+        APPLIED_FILE.write_text("\n".join(sorted(applied)))
+    print(f"removed: {component}")
+
+
+def cmd_check(_args):
+    brief = load_brief()
+    if not brief:
+        print("No brief loaded.")
+        return
+    b = brief["brief"]
+    checks = brief.get("checks", [])
+
+    results = []
+    for check in checks:
+        runner = check["runner"]
+        name = check["name"]
+        script = check["script"]
+        expect = check["expect"]
+
+        container = RUNNER_CONTAINER.get(runner)
+        if not container:
+            print(f"unknown runner: {runner}", file=sys.stderr)
+            continue
+
+        rc = docker_exec(container, ["python3", script], capture=True)
+        actual = "pass" if rc == 0 else "block"
+        results.append(
+            {"runner": runner, "name": name, "expect": expect,
+             "actual": actual, "held": actual == expect}
+        )
+
+    print(f"\nbrief {b['number']} · {b['slug']}\n")
+
+    w = 26
+    adversary = [r for r in results if r["runner"] == "probe"]
+    legitimate = [r for r in results if r["runner"] == "client"]
+
+    if adversary:
+        print(f"{'ADVERSARY CHECKS':<{w}}  {'EXPECT':<8}  {'RESULT':<8}")
+        for r in adversary:
+            mark = "+" if r["held"] else "!"
+            print(f"  {r['name']:<{w-2}}  {r['expect']:<8}  {r['actual']:<8}  {mark}")
+
+    print()
+
+    if legitimate:
+        print(f"{'LEGITIMATE CHECKS':<{w}}  {'EXPECT':<8}  {'RESULT':<8}")
+        for r in legitimate:
+            mark = "+" if r["held"] else "!"
+            print(f"  {r['name']:<{w-2}}  {r['expect']:<8}  {r['actual']:<8}  {mark}")
+
+    print()
+    all_held = all(r["held"] for r in results)
+    print("HEADLINE: HELD" if all_held else "HEADLINE: OPEN")
+    print()
+
+
+def cmd_next(_args):
+    n = current_brief_num()
+    next_n = n + 1
+    if not brief_path(next_n):
+        print(f"No brief {next_n}. End of ladder.")
+        return
+    BRIEF_FILE.write_text(str(next_n))
+    if APPLIED_FILE.exists():
+        APPLIED_FILE.unlink()
+    _reset_boundary()
+    print(f"Advanced to brief {next_n}.")
+    cmd_brief([])
+
+
+def cmd_reset(_args):
+    BRIEF_FILE.write_text("1")
+    if APPLIED_FILE.exists():
+        APPLIED_FILE.unlink()
+    _reset_boundary()
+    print("Reset to brief 1, boundary flat.")
+
+
+def _reset_boundary():
+    docker_exec(
+        BOUNDARY,
+        ["/bin/sh", "-c", "iptables -F FORWARD && iptables -P FORWARD ACCEPT"],
+    )
+
+
+COMMANDS = {
+    "up": cmd_up,
+    "down": cmd_down,
+    "brief": cmd_brief,
+    "build": cmd_build,
+    "remove": cmd_remove,
+    "check": cmd_check,
+    "next": cmd_next,
+    "reset": cmd_reset,
+}
+
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
+        print("usage: lab <command> [args]")
+        print("commands:", "  ".join(COMMANDS))
+        sys.exit(1)
+    COMMANDS[sys.argv[1]](sys.argv[2:])
+
+
+if __name__ == "__main__":
+    main()

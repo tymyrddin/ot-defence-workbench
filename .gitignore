@@ -1,0 +1,8 @@
+.current-brief
+.applied-components
+.venv/
+.idea/
+__pycache__/
+*.pyc
+*.pyo
+clab-*/

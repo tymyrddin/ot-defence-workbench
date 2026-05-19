@@ -1,0 +1,7 @@
+component: packet-filter
+type: boundary-config
+applies-to: boundary
+description: >
+  L3/L4 allowlist on the boundary node. Sets FORWARD policy to DROP,
+  then permits named flows by source IP and destination port.
+  Removes the direct path from the probe to the asset.
