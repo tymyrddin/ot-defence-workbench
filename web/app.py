@@ -352,6 +352,22 @@ def reset():
     return redirect(url_for("index"))
 
 
+@app.route("/prev", methods=["POST"])
+def prev_brief():
+    n = current_brief_num()
+    if n <= 1:
+        flash("Already at the first brief.")
+        return redirect(url_for("index"))
+    BRIEF_FILE.write_text(str(n - 1))
+    APPLIED_FILE.write_text("")
+    RESULTS_FILE.unlink(missing_ok=True)
+    subprocess.run(
+        ["docker", "exec", BOUNDARY, "/bin/sh", "-c",
+         "iptables -F FORWARD && iptables -P FORWARD ACCEPT"]
+    )
+    return redirect(url_for("index"))
+
+
 @app.route("/next", methods=["POST"])
 def next_brief():
     n = current_brief_num()
@@ -401,7 +417,7 @@ def save_defence():
     comp_dir.mkdir(exist_ok=True)
     _write_script(comp_dir / "apply.sh", apply_code)
     _write_script(comp_dir / "remove.sh", DEFAULT_REMOVE)
-    return redirect(url_for("index"))
+    return redirect(url_for("index", comp=name))
 
 
 @app.route("/defence/delete/<name>", methods=["POST"])

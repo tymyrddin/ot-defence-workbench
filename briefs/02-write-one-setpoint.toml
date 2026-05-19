@@ -1,0 +1,60 @@
+[brief]
+number = 2
+slug = "write-one-setpoint"
+title = "Let the client write, hold the probe"
+requirement = """
+The client needs to write one setpoint to the asset. That write must succeed.
+All writes from the probe must still be blocked. The client's reads must
+continue to work.
+
+Brief 1 blocked everything from the north segment indiscriminately. This
+brief asks you to be more selective: permit the client's traffic while
+continuing to refuse the probe's.
+
+Modbus function code 06 writes a single register; FC16 writes multiple. Both
+are unauthenticated; the protocol carries no identity. The only distinction
+available at the network layer is source address. A permit rule scoped to the
+client's IP is the natural first move.
+
+Note the assumption you are building on. Brief 4 will break it.
+"""
+
+[[brief.links]]
+title = "Modbus"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/modbus"
+
+[[brief.links]]
+title = "IT/OT boundary"
+url = "https://blue.tymyrddin.dev/docs/ot/architecture/boundary"
+
+[[brief.links]]
+title = "Zones and conduits"
+url = "https://blue.tymyrddin.dev/docs/ot/architecture/zones"
+
+[[checks]]
+runner = "probe"
+name = "direct-reach"
+script = "/checks/01-direct-reach.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "probe"
+name = "write-attempt"
+script = "/checks/03-write-attempt.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "client-read"
+script = "/checks/01-client-read.py"
+expect = "pass"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "client-write"
+script = "/checks/02-client-write.py"
+expect = "pass"
+protocol = "modbus"

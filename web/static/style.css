@@ -26,6 +26,16 @@ body {
 .brief-text   { color: var(--text); }
 .brief-full   { color: var(--text); }
 .brief-more   { color: var(--muted); }
+.brief-links  { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+.brief-link   {
+  color: var(--accent);
+  font-size: 0.78rem;
+  text-decoration: none;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 1px 7px;
+}
+.brief-link:hover { background: var(--accent); color: #fff; }
 
 .pane-header {
   font-weight: 600;
@@ -173,7 +183,15 @@ textarea.code-editor:focus {
   font-family: inherit;
 }
 .comp-btn:hover { color: var(--text); border-color: var(--text); }
-.comp-btn.is-applied { color: #3fb950; border-color: #3fb950; }
+.comp-btn.is-viewing { color: var(--text); border-color: var(--text); }
+.comp-btn.is-applied {
+  color: #3fb950;
+  border-color: #3fb950;
+  background: rgba(63, 185, 80, 0.12);
+  font-weight: 600;
+}
+.comp-btn.is-applied.is-viewing { background: rgba(63, 185, 80, 0.22); }
+.comp-btn.is-applied:hover { background: rgba(63, 185, 80, 0.22); }
 
 .comp-editor { margin-top: 8px; }
 

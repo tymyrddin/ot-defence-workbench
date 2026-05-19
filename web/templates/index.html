@@ -19,6 +19,11 @@
     <form action="/reset" method="post" class="mb-0">
       <button class="btn btn-sm btn-outline-secondary">Reset bench</button>
     </form>
+    {% if brief and brief.brief.number > 1 %}
+    <form action="/prev" method="post" class="mb-0">
+      <button class="btn btn-sm btn-outline-info">← Prev brief</button>
+    </form>
+    {% endif %}
     <form action="/next" method="post" class="mb-0">
       <button class="btn btn-sm btn-outline-info">Next brief →</button>
     </form>
@@ -38,7 +43,14 @@
       {{ brief.brief.requirement.strip().split('\n')[0] }}
       <a href="#" class="brief-more" onclick="this.parentElement.nextElementSibling.classList.toggle('d-none');return false;"> more</a>
     </div>
-    <pre class="brief-full small mt-2 d-none">{{ brief.brief.requirement.strip() }}</pre>
+    <pre class="brief-full small mt-2 d-none">{{ brief.brief.requirement.strip().split('\n')[1:] | join('\n') }}</pre>
+    {% if brief.brief.links %}
+    <div class="brief-links mt-2">
+      {% for link in brief.brief.links %}
+      <a href="{{ link.url }}" target="_blank" rel="noopener" class="brief-link">{{ link.title }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -168,10 +180,13 @@
       <!-- Rule set selector -->
       <div class="comp-selector">
         {% for comp in components %}
-        <button type="button" class="comp-btn {% if comp.name in applied %}is-applied{% endif %}"
+        <button type="button"
+                class="comp-btn {% if comp.name in applied %}is-applied{% endif %} {% if comp.name == show_comp %}is-viewing{% endif %}"
+                data-comp="{{ comp.name }}"
                 onclick="showEditor('{{ comp.name }}')">{{ comp.name }}{% if comp.name in applied %} ●{% endif %}</button>
         {% endfor %}
-        <button type="button" class="comp-btn" id="btn-new"
+        <button type="button" class="comp-btn {% if show_comp == '__new__' %}is-viewing{% endif %}"
+                data-comp="__new__" id="btn-new"
                 onclick="showEditor('__new__')">+ new</button>
       </div>
 
@@ -193,6 +208,9 @@
           <button type="button" class="btn btn-sm btn-primary"
                   onclick="post('/apply-component/{{ comp.name }}', {})">Activate</button>
           {% endif %}
+          <input type="hidden" class="save-name" value="{{ comp.name }}">
+          <button type="button" class="btn btn-sm btn-outline-secondary"
+                  onclick="saveDefence(this)">Save</button>
           {% if comp.name not in ['packet-filter'] %}
           <button type="button" class="btn btn-sm btn-outline-danger ms-auto"
                   onclick="post('/defence/delete/{{ comp.name }}', {})">Delete</button>
@@ -318,8 +336,11 @@
 
   function showEditor(name) {
     document.querySelectorAll(".comp-editor").forEach(e => e.classList.add("d-none"));
+    document.querySelectorAll(".comp-btn").forEach(b => b.classList.remove("is-viewing"));
     const el = document.getElementById("comp-edit-" + name);
     if (el) el.classList.remove("d-none");
+    const btn = document.querySelector(`.comp-btn[data-comp="${name}"]`);
+    if (btn) btn.classList.add("is-viewing");
   }
 
   function setAllChecks(state) {

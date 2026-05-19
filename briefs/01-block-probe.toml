@@ -5,13 +5,31 @@ title = "Block the probe, keep the client"
 requirement = """
 The probe cannot reach the asset. The client's reads still succeed.
 
-The boundary starts as a transparent bridge — everything passes. Place a
-component that makes the boundary selective: the client's Modbus reads
-reach the asset; the probe's traffic does not.
+The boundary starts as a transparent bridge, all traffic passes through
+unchecked. Your task: make it selective.
 
-Several architectures satisfy this. The check does not ask how you did it,
+Modbus carries no authentication and no integrity check. Anyone who reaches
+port 502 can read or write any register. In January 2024, FrostyGoop sent
+write commands to district heating controllers in Lviv over plain Modbus TCP.
+No exploit. No credential. Port 502 was reachable and the controllers
+complied. Around 600 buildings lost heating for two days.
+
+The network is the only control surface. Place a component on the boundary
+that enforces it. Several architectures satisfy this brief; the check asks
 only whether the outcome holds.
 """
+
+[[brief.links]]
+title = "Modbus"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/modbus"
+
+[[brief.links]]
+title = "FrostyGoop"
+url = "https://blue.tymyrddin.dev/docs/ot/incidents/frostygoop"
+
+[[brief.links]]
+title = "IT/OT boundary"
+url = "https://blue.tymyrddin.dev/docs/ot/architecture/boundary"
 
 [[checks]]
 runner = "probe"
