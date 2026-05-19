@@ -1,0 +1,1 @@
+Closes the direct north-to-south path. Redirects port 502 arriving at the boundary's north interface to the asset using DNAT. The boundary is the single ingress point; no host on the north segment can reach the asset directly.

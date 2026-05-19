@@ -1,0 +1,81 @@
+[brief]
+number = 8
+slug = "layered-defence"
+title = "Two independent controls must both fail"
+
+requirement = """
+Brief 5 used source restriction to block all probe access to the proxy. Brief 7
+used function code filtering to block probe writes while leaving reads open.
+This brief combines both controls fully: the DNAT rule restricts which source
+may use the proxy at all, and the function code filter blocks write FCs from
+any source that is not the client. An attacker must bypass both independently
+to write to the asset.
+
+The probe cannot read via the boundary in this brief. Source restriction means
+the probe's connections to the proxy are not DNAT'd and hit the FORWARD DROP
+policy. The probe-read-via-boundary check now expects block.
+
+Defence in depth means no single control is a single point of failure. If the
+source restriction is bypassed, the function code filter still blocks writes. If
+the function code filter is bypassed, the source restriction still blocks all
+probe access to the proxy. Both must fail simultaneously for the asset to be
+reached and written.
+
+The direct-reach and spoof-client-ip checks carry over from earlier briefs.
+The topology has not changed. No direct path exists from the north segment to
+the asset regardless of source address.
+"""
+
+[[brief.links]]
+title = "Zones and conduits"
+url = "https://blue.tymyrddin.dev/docs/ot/architecture/zones"
+
+[[brief.links]]
+title = "IT/OT boundary"
+url = "https://blue.tymyrddin.dev/docs/ot/architecture/boundary"
+
+[[brief.links]]
+title = "Pipedream"
+url = "https://blue.tymyrddin.dev/docs/ot/incidents/pipedream"
+
+[[checks]]
+runner = "probe"
+name = "direct-reach"
+script = "/checks/01-direct-reach.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "probe"
+name = "spoof-client-ip"
+script = "/checks/04-spoof-client-ip.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "probe"
+name = "probe-write-via-boundary"
+script = "/checks/06-probe-write-via-boundary.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "probe"
+name = "probe-read-via-boundary"
+script = "/checks/05-probe-read-via-boundary.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "read-via-boundary"
+script = "/checks/04-read-via-boundary.py"
+expect = "pass"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "write-via-boundary"
+script = "/checks/05-client-write-via-boundary.py"
+expect = "pass"
+protocol = "modbus"

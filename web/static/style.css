@@ -20,6 +20,7 @@ body {
 
 .navbar { background: #161b22; border-bottom: 1px solid var(--border); }
 .navbar-brand { color: var(--text) !important; font-weight: 600; }
+.brief-nav-num { color: #e6edf3; font-weight: 700; font-size: 1rem; }
 
 .brief-bar    { background: #161b22; border: 1px solid var(--border); }
 .brief-title  { color: #e6edf3; }

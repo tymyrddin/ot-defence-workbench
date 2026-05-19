@@ -1,0 +1,66 @@
+[brief]
+number = 3
+slug = "jump-host"
+title = "No direct path, one controlled gate"
+requirement = """
+No direct path from the north segment to the asset is permitted. The client
+must still be able to read from the asset.
+
+Brief 2 used a source-address allowlist: the client's IP was permitted to
+reach the asset directly. Brief 3 closes that direct path for everyone. No
+host on the north segment may open a socket to the asset. The boundary
+becomes the single controlled gate: traffic arriving at the boundary's north
+interface on port 502 is accepted and forwarded by the boundary itself to
+the asset on the south segment.
+
+In the 2015 and 2016 Ukraine grid attacks, once the attackers were inside the
+perimeter they moved directly to SCADA servers and RTUs. A boundary that
+permits no direct path from the IT-adjacent north segment to the OT south
+segment removes that lateral movement. Every connection to the asset becomes
+visible at the single gate.
+
+The jump-host component uses iptables DNAT. Hosts on the north segment
+connect to the boundary's north interface on port 502; the boundary
+redirects those connections to the asset. No packet travels directly
+between north and south.
+"""
+
+[[brief.links]]
+title = "Remote access"
+url = "https://blue.tymyrddin.dev/docs/ot/architecture/remote-access"
+
+[[brief.links]]
+title = "IT/OT boundary"
+url = "https://blue.tymyrddin.dev/docs/ot/architecture/boundary"
+
+[[brief.links]]
+title = "Ukraine grid attacks"
+url = "https://blue.tymyrddin.dev/docs/ot/incidents/ukraine-grid"
+
+[[checks]]
+runner = "probe"
+name = "direct-reach"
+script = "/checks/01-direct-reach.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "probe"
+name = "write-attempt"
+script = "/checks/03-write-attempt.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "no-direct-south"
+script = "/checks/03-no-direct-south.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "read-via-boundary"
+script = "/checks/04-read-via-boundary.py"
+expect = "pass"
+protocol = "modbus"

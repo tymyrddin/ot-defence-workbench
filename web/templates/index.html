@@ -11,7 +11,10 @@
 
 <nav class="navbar px-3 py-2">
   <span class="navbar-brand">OT Defence Workbench</span>
-  {% if brief %}<span class="text-muted small">brief {{ brief.brief.number }} · {{ brief.brief.slug }}</span>{% endif %}
+  {% if brief %}
+  <span class="brief-nav-num ms-3">Brief {{ brief_num }}</span>
+  <span class="text-muted small ms-2">· {{ brief.brief.slug }}</span>
+  {% endif %}
   <div class="ms-auto d-flex gap-2 align-items-center">
     {% if headline %}
     <span class="badge {% if headline == 'HELD' %}bg-success{% else %}bg-danger{% endif %} fs-6">{{ headline }}</span>
@@ -19,14 +22,19 @@
     <form action="/reset" method="post" class="mb-0">
       <button class="btn btn-sm btn-outline-secondary">Reset bench</button>
     </form>
-    {% if brief and brief.brief.number > 1 %}
-    <form action="/prev" method="post" class="mb-0">
-      <button class="btn btn-sm btn-outline-info">← Prev brief</button>
+    {% if brief_num > 1 %}
+    <form action="/prev" method="post" class="mb-0"
+          onsubmit="return confirm('You are on brief {{ brief_num }}. Go back to brief {{ brief_num - 1 }}? This resets the boundary rules and clears results.')">
+      <button class="btn btn-sm btn-outline-info">← Brief {{ brief_num - 1 }}</button>
     </form>
     {% endif %}
+    {% if has_next %}
     <form action="/next" method="post" class="mb-0">
-      <button class="btn btn-sm btn-outline-info">Next brief →</button>
+      <button class="btn btn-sm btn-outline-info">Brief {{ brief_num + 1 }} →</button>
     </form>
+    {% else %}
+    <button class="btn btn-sm btn-outline-secondary" disabled title="No more briefs">End of ladder</button>
+    {% endif %}
   </div>
 </nav>
 
@@ -41,7 +49,7 @@
     <strong class="brief-title">{{ brief.brief.title }}</strong>
     <div class="brief-text small mt-1">
       {{ brief.brief.requirement.strip().split('\n')[0] }}
-      <a href="#" class="brief-more" onclick="this.parentElement.nextElementSibling.classList.toggle('d-none');return false;"> more</a>
+      <a href="#" class="brief-more" onclick="var p=this.closest('.brief-bar').querySelector('.brief-full');p.classList.toggle('d-none');this.textContent=p.classList.contains('d-none')?' more':' less';return false;"> more</a>
     </div>
     <pre class="brief-full small mt-2 d-none">{{ brief.brief.requirement.strip().split('\n')[1:] | join('\n') }}</pre>
     {% if brief.brief.links %}
@@ -173,7 +181,7 @@
         {% if applied %}
         <span class="status-live">● Active: {{ applied | list | first }}</span>
         {% else %}
-        <span class="status-open">○ No rules active — boundary is open</span>
+        <span class="status-open">○ No rules active, boundary is open</span>
         {% endif %}
       </div>
 
@@ -278,12 +286,12 @@
             {% for r in custom_results %}
             <tr class="row-custom">
               <td>{{ r.name }}</td><td>{{ r.runner }}</td><td>{{ r.get('protocol','') }}</td>
-              <td>—</td><td>{{ r.actual }}</td><td></td>
+              <td>n/a</td><td>{{ r.actual }}</td><td></td>
             </tr>{% endfor %}{% endif %}
           </tbody>
         </table>
         {% else %}
-        <div class="pane-subtitle small py-2">No results yet — run checks to see output.</div>
+        <div class="pane-subtitle small py-2">No results yet. Run checks to see output.</div>
         {% endif %}
       </div>
 
@@ -343,8 +351,32 @@
     if (btn) btn.classList.add("is-viewing");
   }
 
+  const BRIEF_KEY = "probes:brief:{{ brief_num }}";
+
+  function saveCheckState(cb) {
+    const key = BRIEF_KEY + ":" + cb.name + ":" + cb.value;
+    localStorage.setItem(key, cb.checked ? "1" : "0");
+  }
+
+  function restoreCheckStates() {
+    document.querySelectorAll("#checkForm input[type=checkbox]").forEach(cb => {
+      const key = BRIEF_KEY + ":" + cb.name + ":" + cb.value;
+      const saved = localStorage.getItem(key);
+      if (saved !== null) cb.checked = saved === "1";
+    });
+  }
+
+  document.querySelectorAll("#checkForm input[type=checkbox]").forEach(cb => {
+    cb.addEventListener("change", () => saveCheckState(cb));
+  });
+
+  restoreCheckStates();
+
   function setAllChecks(state) {
-    document.querySelectorAll("#checkForm input[type=checkbox]").forEach(cb => cb.checked = state);
+    document.querySelectorAll("#checkForm input[type=checkbox]").forEach(cb => {
+      cb.checked = state;
+      saveCheckState(cb);
+    });
   }
 
   function post(action, fields) {

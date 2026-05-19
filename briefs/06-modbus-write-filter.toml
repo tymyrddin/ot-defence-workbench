@@ -1,0 +1,66 @@
+[brief]
+number = 6
+slug = "modbus-write-filter"
+title = "Writes blocked at the function code"
+
+requirement = """
+Source-address controls depend on the sender being truthful. The function
+code filter makes no such assumption.
+
+The iptables u32 module navigates the variable-length IP and TCP headers
+and reads the function code byte at offset 7 of the TCP payload. Any packet
+carrying a write function code is dropped before any ACCEPT rule sees it.
+Modbus FC05 and FC06 write single coils and registers; FC15 and FC16 write
+multiple. All four are blocked.
+
+The boundary still proxies read requests from any host on the north
+segment, including the probe. Reads pass; writes do not. The probe can
+connect to the boundary proxy and read holding registers but cannot write
+them, regardless of what source address it presents.
+
+Note what this defence costs: the client can no longer write via the
+boundary either. That is the correct posture when the asset is a read-only
+sensor or historian feed. If the client needs write access, function code
+filtering must be combined with an authentication mechanism. Brief 7 takes
+that step.
+"""
+
+[[brief.links]]
+title = "Modbus"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/modbus"
+
+[[brief.links]]
+title = "FrostyGoop"
+url = "https://blue.tymyrddin.dev/docs/ot/incidents/frostygoop"
+
+[[brief.links]]
+title = "Zones and conduits"
+url = "https://blue.tymyrddin.dev/docs/ot/architecture/zones"
+
+[[checks]]
+runner = "probe"
+name = "probe-write-via-boundary"
+script = "/checks/06-probe-write-via-boundary.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "probe"
+name = "probe-read-via-boundary"
+script = "/checks/05-probe-read-via-boundary.py"
+expect = "pass"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "read-via-boundary"
+script = "/checks/04-read-via-boundary.py"
+expect = "pass"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "write-via-boundary"
+script = "/checks/05-client-write-via-boundary.py"
+expect = "block"
+protocol = "modbus"

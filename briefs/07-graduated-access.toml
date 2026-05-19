@@ -1,0 +1,67 @@
+[brief]
+number = 7
+slug = "graduated-access"
+title = "Reads open, writes gated by source"
+
+requirement = """
+Brief 6 enforced a read-only posture by blocking all write function codes.
+When the authorised client must write setpoints, the boundary needs a finer
+distinction: reads permitted from any host on the north segment, writes
+permitted from 10.0.1.10 only.
+
+The graduated-access component opens the DNAT proxy to all north-side hosts
+and adds a function code filter with a source exception. Write function codes
+FC05, FC06, FC15, and FC16 are dropped for any packet whose source is not the
+client's. The client's write requests pass through; the probe's are dropped at
+the function code layer before the ACCEPT rule sees them.
+
+The probe-read-via-boundary check passes here. Reads are not restricted. The
+probe can connect to the boundary proxy and read holding registers freely.
+Brief 8 closes that gap by adding a second independent control.
+
+Note that the write restriction depends on source address, which lives at L3.
+The DNAT topology means the probe cannot spoof its way directly to the asset,
+but the proxy is reachable from any address on the north segment. A write
+from a spoofed source that completes the TCP handshake would pass. Brief 8
+addresses this.
+"""
+
+[[brief.links]]
+title = "Modbus"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/modbus"
+
+[[brief.links]]
+title = "Zones and conduits"
+url = "https://blue.tymyrddin.dev/docs/ot/architecture/zones"
+
+[[brief.links]]
+title = "Volt Typhoon"
+url = "https://blue.tymyrddin.dev/docs/ot/incidents/volt-typhoon"
+
+[[checks]]
+runner = "probe"
+name = "probe-write-via-boundary"
+script = "/checks/06-probe-write-via-boundary.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "probe"
+name = "probe-read-via-boundary"
+script = "/checks/05-probe-read-via-boundary.py"
+expect = "pass"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "read-via-boundary"
+script = "/checks/04-read-via-boundary.py"
+expect = "pass"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "write-via-boundary"
+script = "/checks/05-client-write-via-boundary.py"
+expect = "pass"
+protocol = "modbus"

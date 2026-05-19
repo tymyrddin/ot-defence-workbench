@@ -183,9 +183,14 @@ def index():
         or (components[0]["name"] if components else None)
     )
 
+    brief_num = current_brief_num()
+    has_next = bool(glob.glob(str(LAB_DIR / "briefs" / f"{brief_num+1:02d}-*.toml")))
+
     return render_template(
         "index.html",
         brief=brief,
+        brief_num=brief_num,
+        has_next=has_next,
         checks_by_protocol=checks_by_protocol,
         custom_probes=custom_probes,
         active_protocols=active_protocols,
@@ -342,7 +347,7 @@ def remove(name):
 def reset():
     r = subprocess.run(
         ["docker", "exec", BOUNDARY, "/bin/sh", "-c",
-         "iptables -F FORWARD && iptables -P FORWARD ACCEPT"],
+         "iptables -F FORWARD && iptables -P FORWARD ACCEPT && iptables -t nat -F PREROUTING && iptables -t nat -F POSTROUTING"],
         capture_output=True,
     )
     if r.returncode != 0:
@@ -363,7 +368,7 @@ def prev_brief():
     RESULTS_FILE.unlink(missing_ok=True)
     subprocess.run(
         ["docker", "exec", BOUNDARY, "/bin/sh", "-c",
-         "iptables -F FORWARD && iptables -P FORWARD ACCEPT"]
+         "iptables -F FORWARD && iptables -P FORWARD ACCEPT && iptables -t nat -F PREROUTING && iptables -t nat -F POSTROUTING"]
     )
     return redirect(url_for("index"))
 
@@ -379,7 +384,7 @@ def next_brief():
     RESULTS_FILE.unlink(missing_ok=True)
     subprocess.run(
         ["docker", "exec", BOUNDARY, "/bin/sh", "-c",
-         "iptables -F FORWARD && iptables -P FORWARD ACCEPT"]
+         "iptables -F FORWARD && iptables -P FORWARD ACCEPT && iptables -t nat -F PREROUTING && iptables -t nat -F POSTROUTING"]
     )
     return redirect(url_for("index"))
 

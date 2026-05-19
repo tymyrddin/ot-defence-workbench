@@ -1,191 +1,145 @@
-# OT defence workbench
+# OT Defence Workbench
 
 A containerlab environment for practising OT network defence. Four containers, two
-segments, one asset to protect, one adversary that probes. The skill being practised
-is deciding what may cross a boundary and proving the decision held.
-
-This is a workbench rather than a facility. A simulation lab earns its keep by feeling
-real; a practice environment for defence needs a trust boundary, two sides, an asset,
-and a verdict. Lore would only add weight.
+segments, one asset to protect, one adversary that probes. Each brief states what
+outcome must hold; the workbench tells you whether it does.
 
 ## What it is not
 
-A green scoreboard reports that nothing the probe knows how to attempt got through. It
-does not report secure. The probe battery is finite. The asset is a toy. The workbench
-teaches the shape of a decision, not the specifics of any particular vendor's appliance.
-That distinction is worth carrying from the start.
+A green scoreboard means nothing the probe knows how to attempt got through. It does
+not mean secure. The probe battery is finite, the asset is a simulation, and the
+workbench teaches the shape of a decision rather than the specifics of any particular
+vendor's appliance. That distinction is worth carrying from the start.
 
 ## The estate
 
-Four containers at rest:
-
-- `client` — the legitimate consumer of the asset, on the north segment.
-- `asset` — the protected service, on the south segment. Version 1 runs a Modbus/TCP
-  server.
-- `boundary` — the node the learner builds out. Starts as a transparent bridge that
-  forwards everything.
-- `probe` — the adversary. Sits on the north segment, models an attacker who already
-  holds a foothold on the IT side, and runs a battery of attempts against the asset.
-
-Two networks, north and south, joined only through `boundary`. Nothing reaches `asset`
-except through that node.
-
-Modbus/TCP is the first asset protocol because it has a clean split: read function
-codes against write function codes. "Permit reads, refuse writes" is a crisp,
-demonstrable constraint. Later versions can swap the asset to MQTT or OPC UA.
-
-## The component tray
-
-A defence is a shell script that configures the boundary node — typically iptables rules,
-but any command the boundary container supports. Each component lives in
-`components/<name>/apply.sh`. Flushing a component resets the FORWARD chain to open.
-
-Version 1 components:
-
-- `packet-filter` — an L3/L4 allowlist. Default deny, permits named flows.
-- `jump-host` — a bastion. Once placed it becomes the only node permitted to originate
-  connections to the asset, and it records sessions.
-- `protocol-filter` — a Modbus-aware proxy. Permits read function codes, refuses writes
-  from a configured source. No equivalent in a plain firewall recipe.
-- `read-replica` — a one-way mirror of the asset's register map. The client reads the
-  replica and never opens a socket to the asset.
-- `log-sink` — a collector. Components send events here, giving the learner a visibility
-  plane rather than only a preventive one.
-
-## The control surface
-
-The web UI at `http://localhost:5000` is the primary working surface. It shows the probe
-battery, the component tray, and editable code for both. Participants write and save rules
-and probes directly in the browser.
-
-The CLI handles infrastructure:
-
 ```
-./lab up      build images and start the bench
-./lab down    stop and remove all containers
-./lab reset   flush rules and clear state, bench stays up
-./lab next    advance to the next brief (also resets)
+north segment 10.0.1.0/24          south segment 10.0.2.0/24
+  client  10.0.1.10                   asset  10.0.2.10:502
+  probe   10.0.1.20
+                    boundary  north 10.0.1.1 / south 10.0.2.1
 ```
 
-## Scoring
+- client: the legitimate consumer of the asset.
+- asset: a Modbus/TCP server. Holds a register map the client reads and writes.
+- boundary: the node the learner builds out. Starts as a transparent bridge.
+- probe: the adversary. Sits on the north segment alongside the client and runs a
+  battery of attempts against the asset.
 
-The probe runs a battery of attempts. Each one is an assertion. `lab check` compares
-outcomes to what the current brief expects and prints a scoreboard.
-
-Two points are fixed:
-
-The legitimate flow is scored alongside the attacks. A defence that blocks the probe
-but also breaks the client's reads has not passed. A brief is met only when every
-adversary check is blocked and every legitimate check still succeeds.
-
-Bypass detection needs no special mechanism. Every brief includes a direct-path check.
-A `jump-host` built while the direct route is still open leaves that check failing and
-the headline still shows reach. A defence counts only when the path it was meant to
-replace is shut.
-
-## The briefs
-
-Briefs are constraints, not instructions. Each one states what the outcome must be;
-several architectures may satisfy it. The point is the decision, not the component.
-
-A first ladder:
-
-1. The probe cannot reach the asset. The client's reads still succeed.
-2. The client needs to write one setpoint. That write succeeds; all other writes from
-   the north segment do not.
-3. An engineer needs occasional interactive access to the asset. No direct path from
-   the north segment to the asset is permitted.
-4. The probe now holds the client's address. Source allowlisting alone no longer
-   separates them. The brief still holds.
-5. A second client appears, read-only, from a different segment. Both clients succeed;
-   the probe does not.
-6. The asset is readable from the north without the north segment opening a socket to
-   the asset.
-7. Every cross-boundary access is logged. An unexpected one raises an event.
-8. An estate is handed to the learner with a defence already built and the scoreboard
-   still red. Find what gets through and close it.
-
-Briefs are cumulative by default. `lab reset` is available, and a brief can ask for a
-clean slate where it needs one. Brief 8 is inverted: instead of building, the learner
-is finding. That is a different muscle, and it is the lab teaching its central lesson
-directly rather than as a side effect of a build step.
-
-## Two axes
-
-Briefs and adversary tiers are separate.
-
-**Briefs** evolve what you protect: the constraint, the asset protocol, the topology.
-
-**Adversary tiers** evolve what you protect against. Version 1 ships tier zero: a
-network-external probe that attempts unauthenticated access. Later tiers step inward.
-The first worth adding is an authenticated-but-overprivileged actor, a legitimate
-identity doing something it should not. That is the only adversary a network control
-cannot touch.
-
-The same brief replays under a stronger adversary and fails differently. The estate
-stays at four containers throughout; the difficulty lives in the tier, not the size.
-
-## Project layout
-
-```
-topology.clab.yml                    base four-node bench
-asset/                               Modbus/TCP server image
-client/                              legitimate consumer image and checks
-probe/                               adversary image
-  checks/                            brief check scripts
-  custom/<protocol>/<name>.py        participant-written probes, organised by protocol
-boundary/                            boundary node image
-components/<name>/apply.sh           one directory per component, one apply script each
-briefs/<nn>-<slug>.toml              one file per brief: requirement and expected outcomes
-web/                                 Flask web UI
-lab                                  CLI (infrastructure only)
-README.md
-```
-
-containerlab handles the two-segment topology cleanly. Plain Docker Compose is a
-workable fallback if containerlab adds friction for the component-injection step.
+The asset is only reachable through the boundary. Nothing on the north segment has a
+direct route to the south segment.
 
 ## Running it
 
-**Prerequisites:** Docker, [containerlab](https://containerlab.dev/install/), Python 3.11+.
+Prerequisites: Docker, [containerlab](https://containerlab.dev/install/), Python 3.11+.
 
 ```
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ./lab up
-.venv/bin/python web/app.py
+python web/app.py
 ```
 
 Open `http://localhost:5000`.
 
-The web UI is the working surface: probe battery with editable check scripts organised by
-protocol, component tray with editable apply scripts, results table. Participants write
-defences and custom probes directly in the browser and save them back to disk.
+When a brief requires a new container image (a new check script is added to
+`probe/checks/` or `client/checks/`), restart the lab:
 
-`probe/custom/<protocol>/` holds participant-written probes. `_template.py` is the
-starting point. Custom probes appear in the web UI under their protocol tab and run
-alongside brief checks when the probe battery fires.
+```
+./lab down && ./lab up
+```
 
-## The smallest first slice
+Only needed when adding new material.
 
-- `lab up` with the four nodes and the Modbus asset.
-- One component: `packet-filter`.
-- One brief: brief 1 from the ladder.
-- A probe with four checks: direct port reachable, anonymous read, write attempt, and
-  the client's legitimate read.
+## The web UI
 
-`lab up`, then `lab check` showing the bench owned, then `lab build packet-filter`,
-then `lab check` showing it held. Every later component, brief, and tier is that
-skeleton repeated.
+The web interface is the working surface. It has three sections.
+
+Probe Battery: the checks the probe and client will run. Brief checks come from
+the active brief's TOML file and show the source script. Custom probes can be written
+and saved directly in the browser under any supported protocol tab.
+
+Firewall Rules: the components available on the boundary. Select one to view or
+edit its `apply.sh`, then activate it. Only one component is active at a time.
+Activating a new one flushes the previous. The Save button saves changes to disk
+without activating.
+
+Results: the outcome of the last run. Each check shows whether the result matched
+the brief's expectation. The headline HELD or OPEN reflects whether all brief checks
+passed their expected outcomes. Custom probe results are shown separately and do not
+affect the headline.
+
+Use Next brief and Prev brief to move through the ladder. Navigation resets the
+boundary rules and clears results.
+
+## The briefs
+
+Eight briefs form a ladder. Each introduces a new condition or attack vector and asks
+for a defence that holds.
+
+| # | Slug                    | Teaches                                                                                                       |
+|---|-------------------------|---------------------------------------------------------------------------------------------------------------|
+| 1 | block-probe             | Basic network segmentation: FORWARD DROP with a permit for the client.                                        |
+| 2 | write-one-setpoint      | Source allowlisting: permit by IP, introducing the assumption that breaks in brief 4.                         |
+| 3 | jump-host               | Topology control: close the direct path, proxy all connections through the boundary via DNAT.                 |
+| 4 | spoof-proof             | IP spoofing: the jump-host holds because it does not inspect source addresses.                                |
+| 5 | source-restricted-proxy | Tighten the proxy: restrict the DNAT rule to the authorised source so the probe cannot use the proxy at all.  |
+| 6 | modbus-write-filter     | Protocol-layer enforcement: iptables u32 drops write function codes regardless of source.                     |
+| 7 | graduated-access        | Graduated access: reads open to all, writes gated to the authorised host.                                     |
+| 8 | layered-defence         | Defence in depth: source restriction and function code filter are independent; both must fail simultaneously. |
+
+## The components
+
+Each component lives in `components/<name>/apply.sh`. Activating a component copies
+the script to the boundary container and executes it. `remove.sh` is called when the
+component is flushed.
+
+| Component                 | What it does                                                                        |
+|---------------------------|-------------------------------------------------------------------------------------|
+| `packet-filter`           | FORWARD DROP with commented permit rules to fill in.                                |
+| `client-allowlist`        | Permits the client's IP through, drops everything else.                             |
+| `jump-host`               | DNAT proxy: redirects port 502 to the asset, no source restriction.                 |
+| `source-restricted-proxy` | DNAT proxy restricted to the client's source address.                               |
+| `modbus-write-filter`     | Jump-host base with u32 rules blocking all Modbus write FCs.                        |
+| `graduated-access`        | Open DNAT proxy with write FCs blocked for all sources except the client.           |
+| `layered-defence`         | Source-restricted DNAT combined with write FC filter as a second independent layer. |
+
+## Custom probes
+
+Write a probe script in the New probe section of the UI, assign it a protocol and
+name, and save. It appears in the protocol tab alongside brief checks. Custom probes
+run when selected and their results appear in the CUSTOM PROBES section of the results
+table. They do not affect the HELD/OPEN headline.
+
+Saved probes live in `probe/custom/<protocol>/<name>.py`. The template at
+`probe/custom/_template.py` is the starting point.
+
+## Project layout
+
+```
+topology.clab.yml
+asset/                          Modbus/TCP server image
+boundary/                       boundary node image
+client/
+  checks/                       check scripts run from the client container
+probe/
+  checks/                       check scripts run from the probe container
+  custom/                       participant-written probes, organised by protocol
+components/<name>/
+  apply.sh                      iptables rules applied to the boundary
+  remove.sh                     flush script
+briefs/<nn>-<slug>.toml         brief definition: requirement, links, expected checks
+web/
+  app.py                        Flask application
+  templates/index.html
+  static/
+lab                             CLI: up / down
+requirements.txt
+```
 
 ## How it sits with the rest of the site
 
-The [blue documentation](https://blue.tymyrddin.dev) covers the per-protocol recipes
-and the architecture patterns. Prose cannot verify an implementation. The workbench
-makes those decisions verifiable and surfaces what was left open rather than only what
-was configured.
-
-Each component links back to the relevant protocol page. Each brief links to an incident
-in the incidents section, since a brief tends to be an incident's antidote made
-practisable. The topology is the Purdue model from the architecture pages in executable
-form.
+The [blue documentation](https://blue.tymyrddin.dev/docs/ot/) covers the per-protocol
+security recipes and the architecture patterns. The workbench makes those decisions
+executable: each brief links to a relevant doc page, and each component is the
+iptables translation of a pattern described there.

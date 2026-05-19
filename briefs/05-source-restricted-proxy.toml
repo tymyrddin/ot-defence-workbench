@@ -1,0 +1,59 @@
+[brief]
+number = 5
+slug = "source-restricted-proxy"
+title = "The boundary proxy forwards connections from any host"
+
+requirement = """
+The jump-host component opens a DNAT rule with no source restriction.
+
+The PREROUTING rule redirects any TCP connection arriving on the north
+interface to the asset, regardless of source address. The probe, from
+10.0.1.20, connects to 10.0.1.1:502 and the boundary forwards it straight
+to 10.0.2.10:502. No permit rule was ever specific to the client.
+
+The fix is a single constraint on the DNAT rule: restrict it to the
+client's source address. Connections from any other host arrive at the
+boundary, find no matching DNAT entry, and hit the DROP policy on the
+FORWARD chain. The probe cannot read or write via the proxy.
+
+The probe-read-via-boundary check connects to the boundary proxy from the
+probe's own address. The source-restricted proxy must block it. The client
+read and write via the boundary must still succeed.
+
+Note what the source restriction assumes: that the client's address cannot
+be reached from the probe through other means. That assumption holds at the
+network layer. Brief 6 introduces a control that does not rely on it.
+"""
+
+[[brief.links]]
+title = "Zones and conduits"
+url = "https://blue.tymyrddin.dev/docs/ot/architecture/zones"
+
+[[brief.links]]
+title = "Modbus"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/modbus"
+
+[[brief.links]]
+title = "Pipedream"
+url = "https://blue.tymyrddin.dev/docs/ot/incidents/pipedream"
+
+[[checks]]
+runner = "probe"
+name = "probe-read-via-boundary"
+script = "/checks/05-probe-read-via-boundary.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "read-via-boundary"
+script = "/checks/04-read-via-boundary.py"
+expect = "pass"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "write-via-boundary"
+script = "/checks/05-client-write-via-boundary.py"
+expect = "pass"
+protocol = "modbus"

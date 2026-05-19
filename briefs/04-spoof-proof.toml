@@ -1,0 +1,60 @@
+[brief]
+number = 4
+slug = "spoof-proof"
+title = "The probe holds the client's address"
+requirement = """
+The probe now operates from the client's IP address. Source allowlisting
+alone no longer separates them. The brief still holds.
+
+Brief 2 used a source-address rule: permit port 502 from 10.0.1.10. That
+rule now permits the probe just as readily as it permits the client. Any
+defence that trusts a source address as proof of identity fails here.
+
+The jump-host defence from brief 3 holds under this condition because it
+does not inspect source addresses at all. It blocks all direct paths from
+the north segment to the asset regardless of who is asking. The probe with
+the client's address still cannot open a socket directly to 10.0.2.10:502.
+
+The spoof-client-ip check temporarily assigns 10.0.1.10 to the probe's
+interface, attempts a direct TCP connection to the asset, then releases the
+address. A source-allowlist defence will pass this check; the jump-host
+defence will block it.
+
+Note what this defence does not prevent: the probe using the client's
+address to connect via the boundary proxy. That gap requires a control that
+looks inside the protocol, not just at the network layer. Brief 6 addresses
+it from a different direction.
+"""
+
+[[brief.links]]
+title = "Zones and conduits"
+url = "https://blue.tymyrddin.dev/docs/ot/architecture/zones"
+
+[[brief.links]]
+title = "Volt Typhoon"
+url = "https://blue.tymyrddin.dev/docs/ot/incidents/volt-typhoon"
+
+[[brief.links]]
+title = "Modbus"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/modbus"
+
+[[checks]]
+runner = "probe"
+name = "direct-reach"
+script = "/checks/01-direct-reach.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "probe"
+name = "spoof-client-ip"
+script = "/checks/04-spoof-client-ip.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "read-via-boundary"
+script = "/checks/04-read-via-boundary.py"
+expect = "pass"
+protocol = "modbus"
