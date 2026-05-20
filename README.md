@@ -1,5 +1,7 @@
 # OT Defence Workbench
 
+![Dashboard](screenshot.png)
+
 A containerlab environment for practising OT network defence. Four containers, two
 segments, one asset to protect, one adversary that probes. Each brief states what
 outcome must hold; the workbench tells you whether it does.
