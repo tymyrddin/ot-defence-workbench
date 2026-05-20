@@ -16,13 +16,15 @@ vendor's appliance. That distinction is worth carrying from the start.
 
 ```
 north segment 10.0.1.0/24          south segment 10.0.2.0/24
-  client  10.0.1.10                   asset  10.0.2.10:502
-  probe   10.0.1.20
+  client  10.0.1.10                   asset  10.0.2.10:502 (Modbus)
+  probe   10.0.1.20                          10.0.2.10:1883 (MQTT)
                     boundary  north 10.0.1.1 / south 10.0.2.1
 ```
 
 - client: the legitimate consumer of the asset.
-- asset: a Modbus/TCP server. Holds a register map the client reads and writes.
+- asset: a Modbus/TCP server (port 502) and an MQTT broker (port 1883). Holds a
+  register map the client reads and writes; serves telemetry and command topics
+  over MQTT.
 - boundary: the node the learner builds out. Starts as a transparent bridge.
 - probe: the adversary. Sits on the north segment alongside the client and runs a
   battery of attempts against the asset.
@@ -88,6 +90,7 @@ for a defence that holds.
 | 6 | modbus-write-filter     | Protocol-layer enforcement: iptables u32 drops write function codes regardless of source.                     |
 | 7 | graduated-access        | Graduated access: reads open to all, writes gated to the authorised host.                                     |
 | 8 | layered-defence         | Defence in depth: source restriction and function code filter are independent; both must fail simultaneously. |
+| 9 | mqtt-block-probe        | Protocol breadth: same segmentation principle applied to MQTT; no auth, wildcard subscribe, command publish.  |
 
 ## The components
 
@@ -104,6 +107,7 @@ component is flushed.
 | `modbus-write-filter`     | Jump-host base with u32 rules blocking all Modbus write FCs.                        |
 | `graduated-access`        | Open DNAT proxy with write FCs blocked for all sources except the client.           |
 | `layered-defence`         | Source-restricted DNAT combined with write FC filter as a second independent layer. |
+| `mqtt-port-filter`        | Blocks port 1883 from the probe; permits MQTT from the client only.                 |
 
 ## Custom probes
 

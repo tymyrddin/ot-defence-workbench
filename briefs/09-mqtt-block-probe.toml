@@ -1,0 +1,55 @@
+[brief]
+number = 9
+slug = "mqtt-block-probe"
+title = "Block the MQTT probe"
+requirement = """
+The probe cannot reach the MQTT broker. The client's connection still succeeds.
+
+The broker starts with allow_anonymous true and no TLS. Any host that reaches
+port 1883 can subscribe to # and receive all process telemetry, or publish to
+command topics and affect physical state — no credentials, no exploit, just a
+TCP connection and a CONNECT packet.
+
+Researchers scanning Shodan in 2023 found over 50,000 publicly reachable MQTT
+brokers with anonymous access enabled; several served live industrial process
+data. On a flat OT network the reach requirement drops to: same subnet.
+
+Network segmentation is the control surface available here. Place a component
+on the boundary that enforces it.
+"""
+
+[[brief.links]]
+title = "MQTT"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/mqtt"
+
+[[brief.links]]
+title = "IT/OT boundary"
+url = "https://blue.tymyrddin.dev/docs/ot/architecture/boundary"
+
+[[checks]]
+runner = "probe"
+name = "mqtt-connect"
+script = "/checks/07-mqtt-connect.py"
+expect = "block"
+protocol = "mqtt"
+
+[[checks]]
+runner = "probe"
+name = "mqtt-subscribe"
+script = "/checks/08-mqtt-subscribe.py"
+expect = "block"
+protocol = "mqtt"
+
+[[checks]]
+runner = "probe"
+name = "mqtt-publish"
+script = "/checks/09-mqtt-publish.py"
+expect = "block"
+protocol = "mqtt"
+
+[[checks]]
+runner = "client"
+name = "mqtt-client"
+script = "/checks/06-mqtt-client.py"
+expect = "pass"
+protocol = "mqtt"

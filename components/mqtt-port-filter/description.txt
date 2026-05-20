@@ -1,0 +1,1 @@
+Block port 1883 from the probe; allow MQTT from the client only

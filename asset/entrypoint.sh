@@ -12,4 +12,5 @@ ip addr add 10.0.2.10/24 dev eth1
 ip link set eth1 up
 ip route add default via 10.0.2.1
 
+mosquitto -c /app/mosquitto.conf &
 exec python3 /app/server.py

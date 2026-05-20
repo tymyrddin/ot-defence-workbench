@@ -57,13 +57,13 @@ def _bridge_exists(name):
 def _ensure_bridges():
     for name in ("north", "south"):
         if not _bridge_exists(name):
-            subprocess.run(["ip", "link", "add", name, "type", "bridge"], check=True)
-            subprocess.run(["ip", "link", "set", name, "up"], check=True)
+            subprocess.run(["sudo", "ip", "link", "add", name, "type", "bridge"], check=True)
+            subprocess.run(["sudo", "ip", "link", "set", name, "up"], check=True)
 
 
 def _delete_bridges():
     for name in ("north", "south"):
-        subprocess.run(["ip", "link", "delete", name], capture_output=True)
+        subprocess.run(["sudo", "ip", "link", "delete", name], capture_output=True)
 
 
 def cmd_up(_args):
