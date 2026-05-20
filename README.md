@@ -20,12 +20,13 @@ north segment 10.0.1.0/24          south segment 10.0.2.0/24
   probe   10.0.1.20                          10.0.2.10:802  (Modbus/TLS)
                                              10.0.2.10:1883 (MQTT)
                                              10.0.2.10:2404 (IEC 104)
+                                             10.0.2.10:4840 (OPC-UA)
                                              EtherType 0x88B8 (GOOSE)
                     boundary  north 10.0.1.1 / south 10.0.2.1
 ```
 
 - client: the legitimate consumer of the asset.
-- asset: a Modbus/TCP server (port 502) and an MQTT broker (port 1883). Holds a
+- asset: a Modbus/TCP server (port 502) and an MQTT broker (port 1883) and an OPC-UA server (port 4840). Holds a
   register map the client reads and writes; serves telemetry and command topics
   over MQTT.
 - boundary: the node the learner builds out. Starts as a transparent bridge.
@@ -107,12 +108,15 @@ The briefs form a ladder. Each introduces new conditions and/or attack vectors a
 | 15 | goose-block-probe       | Layer 2 enforcement: GOOSE trip blocked at the relay by source MAC; iptables cannot see it.                    |
 | 16 | goose-trip-filter       | Content filter: relay parses allData BER field and drops BOOLEAN TRUE (trip); cancel frames pass.              |
 | 17 | goose-sa                | Application-layer auth: IEC 62351-6 SA on the asset; unsigned GOOSE frames dropped, no echo.                   |
+| 18 | opcua-port-block        | Protocol breadth: same port-block principle applied to OPC-UA (port 4840); client reads process data.          |
+| 19 | opcua-auth              | Application-layer auth: boundary transparent, OPC-UA server rejects anonymous sessions (BadUserAccessDenied).  |
+| 20 | opcua-sec-policy        | Security policy negotiation: server requires Basic256Sha256_Sign; None-policy probe rejected at handshake.     |
 
 ## The components
 
 Each component lives in `components/<name>/apply.sh`. Activating a component copies
 the script to the boundary container and executes it. Components may also include
-`asset.sh` to configure the asset container directly (used by briefs 11 and 14). `remove.sh`
+`asset.sh` to configure the asset container directly (used by briefs 11, 14, 19, and 20). `remove.sh`
 and `asset-remove.sh` are called when the component is flushed.
 
 | Component                 | What it does                                                                           |
@@ -133,6 +137,9 @@ and `asset-remove.sh` are called when the component is flushed.
 | `iec104-command-filter`   | Rejects IEC 104 C_SC_NA_1 (type 0x2D) via u32; connect and STARTDT pass.               |
 | `iec104-sa-asset`         | Transparent boundary + IEC 62351-5 SA on the asset; unauthenticated commands rejected. |
 | `goose-block-probe`       | Adds probe MAC to the boundary's GOOSE relay block list; client GOOSE passes.          |
+| `opcua-port-filter`       | Blocks port 4840 from the probe; permits OPC-UA from the client only.                  |
+| `opcua-auth-asset`        | Transparent boundary + OPC-UA server requires credentials; anonymous sessions rejected. |
+| `opcua-sec-policy`        | Transparent boundary + OPC-UA server requires Basic256Sha256_Sign; None policy rejected. |
 
 
 ## Customisation

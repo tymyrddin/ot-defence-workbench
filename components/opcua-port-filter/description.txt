@@ -1,0 +1,1 @@
+Block OPC-UA port 4840 from the probe; permit from the client only

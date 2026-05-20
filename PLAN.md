@@ -2,7 +2,7 @@
 
 Possible directions. Grouped by what they teach and what they require.
 
-The ladder currently ends at brief 17 (goose-sa).
+The ladder currently ends at brief 20 (opcua-sec-policy).
 
 ---
 
@@ -12,19 +12,11 @@ OPC-UA (port 4840) is the dominant data exchange protocol in European manufactur
 and process industry. It has three security modes (None, Sign, SignAndEncrypt) and
 three authentication methods (anonymous, username, certificate). A small ladder:
 
-**Brief 18: OPC-UA port block**
-Direct analogue of brief 12. Block TCP 4840 from the probe; client connects.
+~~**Brief 18: OPC-UA port block**~~ — implemented.
 
-**Brief 19: OPC-UA anonymous block**
-Server requires at minimum username/password authentication. The probe's anonymous
-session is rejected at the application layer; the client connects with credentials.
-Boundary transparent. Same `asset.sh` toggle pattern as briefs 11 and 14.
+~~**Brief 19: OPC-UA anonymous block**~~ — implemented.
 
-**Brief 20: OPC-UA security policy**
-Server requires `Basic256Sha256` signing (rejects `None` policy). The probe
-connects with security policy None → server rejects. Client connects with Sign →
-server accepts. Teaches that OPC-UA's security policy is negotiated at session
-establishment, not enforced at the network layer.
+~~**Brief 20: OPC-UA security policy**~~ — implemented.
 
 **Library:** `asyncua` installs cleanly on Alpine via musllinux_1_2 wheels — no
 source builds needed. Its two C-extension dependencies (`cryptography>=48,<49`

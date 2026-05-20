@@ -1,0 +1,47 @@
+[brief]
+number = 20
+slug = "opcua-sec-policy"
+title = "OPC-UA security policy (Basic256Sha256)"
+requirement = """
+The probe's None-policy session is rejected by the server. The client
+connects with Basic256Sha256 signing and reads process data.
+
+Briefs 18 and 19 use network-layer blocking and application-layer
+authentication respectively. This brief adds a third axis: the security
+policy negotiated at session establishment.
+
+The OPC-UA server is configured to accept only the Basic256Sha256_Sign
+security policy. When the probe connects using the None policy, the server
+responds to the discovery Hello and returns its endpoint list — but the list
+contains no None-policy endpoint. The probe's client library cannot find a
+matching endpoint and the session fails. No TCP block, no credential check:
+the rejection happens during security policy negotiation.
+
+The authorised client connects with Basic256Sha256_Sign. It fetches the
+endpoint list (over a temporary None-security discovery channel), selects
+the matching endpoint, obtains the server certificate from the endpoint
+description, and establishes a signed session using its own certificate
+and private key. The boundary is transparent throughout.
+
+This teaches that OPC-UA's security policy is negotiated at session
+establishment, not enforced at the network layer. The probe reaches
+the asset at TCP level; the control is inside the protocol handshake.
+"""
+
+[[brief.links]]
+title = "OPC-UA"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/opc-ua"
+
+[[checks]]
+runner = "probe"
+name = "opcua-sec-policy-probe"
+script = "/checks/15-opcua-anon-session.py"
+expect = "block"
+protocol = "opc-ua"
+
+[[checks]]
+runner = "client"
+name = "opcua-sec-client"
+script = "/checks/19-opcua-sec-client.py"
+expect = "pass"
+protocol = "opc-ua"

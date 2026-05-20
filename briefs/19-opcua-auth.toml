@@ -1,0 +1,46 @@
+[brief]
+number = 19
+slug = "opcua-auth"
+title = "OPC-UA username/password authentication"
+requirement = """
+The probe can reach port 4840 but cannot open an OPC-UA session. The client
+connects with valid credentials and reads process data.
+
+Brief 18 placed a boundary rule that dropped the probe's OPC-UA packets.
+This brief takes a different approach: the boundary is transparent, and the
+OPC-UA server itself rejects anonymous sessions. The probe completes the
+TCP handshake and sends an OPC-UA Hello; the server responds but rejects
+the ActivateSession request with BadUserAccessDenied. The TCP port is
+open; the defence is at the application layer.
+
+The asset switches the OPC-UA server to require username/password
+authentication. This is the OPC-UA analogue of brief 11 (MQTT broker
+password auth): the same probe is stopped, by a different mechanism, at a
+different layer. In both cases the boundary is transparent and the control
+lives inside the protocol itself.
+"""
+
+[[brief.links]]
+title = "OPC-UA"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/opc-ua"
+
+[[checks]]
+runner = "probe"
+name = "opcua-tcp-connect"
+script = "/checks/14-opcua-tcp-connect.py"
+expect = "pass"
+protocol = "opc-ua"
+
+[[checks]]
+runner = "probe"
+name = "opcua-anon-session"
+script = "/checks/15-opcua-anon-session.py"
+expect = "block"
+protocol = "opc-ua"
+
+[[checks]]
+runner = "client"
+name = "opcua-auth-client"
+script = "/checks/18-opcua-auth-client.py"
+expect = "pass"
+protocol = "opc-ua"

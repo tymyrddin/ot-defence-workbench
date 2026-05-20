@@ -1,0 +1,36 @@
+[brief]
+number = 18
+slug = "opcua-port-block"
+title = "OPC-UA port block"
+requirement = """
+The probe cannot reach the asset on port 4840. The client connects to
+the OPC-UA server and reads process data.
+
+OPC-UA (port 4840) is the dominant data exchange protocol in European
+manufacturing and process industry. This brief is the direct analogue of
+brief 12 (IEC 104 port block): the same network-layer segmentation principle
+applied to OPC-UA.
+
+Blocking port 4840 at the boundary prevents the probe from establishing
+an OPC-UA session. The authorised client is permitted through. No
+application-layer inspection is required; the protocol is indistinguishable
+from any TCP service at the network layer.
+"""
+
+[[brief.links]]
+title = "OPC-UA"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/opc-ua"
+
+[[checks]]
+runner = "probe"
+name = "opcua-connect"
+script = "/checks/15-opcua-anon-session.py"
+expect = "block"
+protocol = "opc-ua"
+
+[[checks]]
+runner = "client"
+name = "opcua-client"
+script = "/checks/17-opcua-client.py"
+expect = "pass"
+protocol = "opc-ua"

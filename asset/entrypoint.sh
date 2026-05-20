@@ -16,4 +16,5 @@ mosquitto -c /app/mosquitto.conf &
 python3 /app/goose-server.py &
 python3 /app/iec104-server.py &
 python3 /app/modbus-tls-server.py &
+python3 /app/opcua-server.py &
 exec python3 /app/server.py

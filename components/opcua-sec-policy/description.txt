@@ -1,0 +1,1 @@
+Transparent boundary + OPC-UA server requires Basic256Sha256 signing; None policy rejected
