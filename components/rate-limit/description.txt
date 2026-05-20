@@ -1,0 +1,1 @@
+Per-source-IP connection rate limit (3/minute, burst 3); probe exhausts its bucket, client's separate bucket is unaffected

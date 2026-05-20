@@ -1,0 +1,42 @@
+[brief]
+number = 21
+slug = "rate-limit"
+title = "Connection rate limit"
+requirement = """
+The probe's rapid connection attempts are throttled to the point where
+most fail. The client's single connection is unaffected.
+
+Briefs 1–20 used content filtering, source allowlisting, and protocol-layer
+authentication. This brief introduces volumetric protection: a different
+class of control that limits HOW MANY connections a source may open, not
+WHAT those connections carry.
+
+iptables hashlimit tracks a token bucket per source IP. The probe and the
+client have independent buckets. The probe makes ten rapid TCP connections
+to port 502; only the first three (the burst) succeed before the bucket
+empties and new connections are silently dropped. The client makes a single
+connection, well within its own bucket.
+
+The failure mode worth knowing: this control is per source IP, not per
+host identity. A NAT gateway that routes both authorised and unauthorised
+traffic from the same IP would share one bucket. Rapid legitimate traffic
+from a single source (polling, reconnect storms) is equally affected.
+"""
+
+[[brief.links]]
+title = "Modbus"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/modbus"
+
+[[checks]]
+runner = "probe"
+name = "rate-hammer"
+script = "/checks/16-rate-hammer.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "client-read"
+script = "/checks/01-client-read.py"
+expect = "pass"
+protocol = "modbus"

@@ -89,28 +89,29 @@ boundary rules and clears results.
 
 The briefs form a ladder. Each introduces new conditions and/or attack vectors and asks for a defence that holds.
 
-| #  | Slug                    | Teaches                                                                                                        |
-|----|-------------------------|----------------------------------------------------------------------------------------------------------------|
-| 1  | block-probe             | Basic network segmentation: FORWARD DROP with a permit for the client.                                         |
-| 2  | write-one-setpoint      | Source allowlisting: permit by IP, introducing the assumption that breaks in brief 4.                          |
-| 3  | jump-host               | Topology control: close the direct path, proxy all connections through the boundary via DNAT.                  |
-| 4  | spoof-proof             | IP spoofing: the jump-host holds because it does not inspect source addresses.                                 |
-| 5  | source-restricted-proxy | Tighten the proxy: restrict the DNAT rule to the authorised source so the probe cannot use the proxy at all.   |
-| 6  | modbus-write-filter     | Protocol-layer enforcement: iptables u32 drops write function codes regardless of source.                      |
-| 7  | graduated-access        | Graduated access: reads open to all, writes gated to the authorised host.                                      |
-| 8  | layered-defence         | Defence in depth: source restriction and function code filter are independent; both must fail simultaneously.  |
-| 9  | modbus-tls              | Upgrade the transport: block plain port 502, serve Modbus/TLS on 802; client connects with TLS.                |
-| 10 | mqtt-block-probe        | Protocol breadth: same segmentation principle applied to MQTT; no auth, wildcard subscribe, command publish.   |
-| 11 | mqtt-auth               | Application-layer auth: boundary transparent, mosquitto rejects anonymous CONNECT with rc=5.                   |
-| 12 | iec104-block-probe      | Ukraine 2015/2016: block IEC 104 (port 2404) from the probe; C_SC_NA_1 trip command as the adversary payload.  |
-| 13 | iec104-command-filter   | Protocol-layer enforcement: u32 rejects C_SC_NA_1 (0x2D) on the ASDU type byte; connect and STARTDT pass.      |
-| 14 | iec104-sa               | Application-layer auth: IEC 62351-5 SA on the asset rejects unauthenticated commands; boundary is transparent. |
-| 15 | goose-block-probe       | Layer 2 enforcement: GOOSE trip blocked at the relay by source MAC; iptables cannot see it.                    |
-| 16 | goose-trip-filter       | Content filter: relay parses allData BER field and drops BOOLEAN TRUE (trip); cancel frames pass.              |
-| 17 | goose-sa                | Application-layer auth: IEC 62351-6 SA on the asset; unsigned GOOSE frames dropped, no echo.                   |
-| 18 | opcua-port-block        | Protocol breadth: same port-block principle applied to OPC-UA (port 4840); client reads process data.          |
-| 19 | opcua-auth              | Application-layer auth: boundary transparent, OPC-UA server rejects anonymous sessions (BadUserAccessDenied).  |
-| 20 | opcua-sec-policy        | Security policy negotiation: server requires Basic256Sha256_Sign; None-policy probe rejected at handshake.     |
+| #  | Slug                    | Teaches                                                                                                         |
+|----|-------------------------|-----------------------------------------------------------------------------------------------------------------|
+| 1  | block-probe             | Basic network segmentation: FORWARD DROP with a permit for the client.                                          |
+| 2  | write-one-setpoint      | Source allowlisting: permit by IP, introducing the assumption that breaks in brief 4.                           |
+| 3  | jump-host               | Topology control: close the direct path, proxy all connections through the boundary via DNAT.                   |
+| 4  | spoof-proof             | IP spoofing: the jump-host holds because it does not inspect source addresses.                                  |
+| 5  | source-restricted-proxy | Tighten the proxy: restrict the DNAT rule to the authorised source so the probe cannot use the proxy at all.    |
+| 6  | modbus-write-filter     | Protocol-layer enforcement: iptables u32 drops write function codes regardless of source.                       |
+| 7  | graduated-access        | Graduated access: reads open to all, writes gated to the authorised host.                                       |
+| 8  | layered-defence         | Defence in depth: source restriction and function code filter are independent; both must fail simultaneously.   |
+| 9  | modbus-tls              | Upgrade the transport: block plain port 502, serve Modbus/TLS on 802; client connects with TLS.                 |
+| 10 | mqtt-block-probe        | Protocol breadth: same segmentation principle applied to MQTT; no auth, wildcard subscribe, command publish.    |
+| 11 | mqtt-auth               | Application-layer auth: boundary transparent, mosquitto rejects anonymous CONNECT with rc=5.                    |
+| 12 | iec104-block-probe      | Ukraine 2015/2016: block IEC 104 (port 2404) from the probe; C_SC_NA_1 trip command as the adversary payload.   |
+| 13 | iec104-command-filter   | Protocol-layer enforcement: u32 rejects C_SC_NA_1 (0x2D) on the ASDU type byte; connect and STARTDT pass.       |
+| 14 | iec104-sa               | Application-layer auth: IEC 62351-5 SA on the asset rejects unauthenticated commands; boundary is transparent.  |
+| 15 | goose-block-probe       | Layer 2 enforcement: GOOSE trip blocked at the relay by source MAC; iptables cannot see it.                     |
+| 16 | goose-trip-filter       | Content filter: relay parses allData BER field and drops BOOLEAN TRUE (trip); cancel frames pass.               |
+| 17 | goose-sa                | Application-layer auth: IEC 62351-6 SA on the asset; unsigned GOOSE frames dropped, no echo.                    |
+| 18 | opcua-port-block        | Protocol breadth: same port-block principle applied to OPC-UA (port 4840); client reads process data.           |
+| 19 | opcua-auth              | Application-layer auth: boundary transparent, OPC-UA server rejects anonymous sessions (BadUserAccessDenied).   |
+| 20 | opcua-sec-policy        | Security policy negotiation: server requires Basic256Sha256_Sign; None-policy probe rejected at handshake.      |
+| 21 | rate-limit              | Volumetric protection: per-source-IP token bucket throttles rapid connections; client's separate bucket intact. |
 
 ## The components
 
@@ -140,6 +141,7 @@ and `asset-remove.sh` are called when the component is flushed.
 | `opcua-port-filter`       | Blocks port 4840 from the probe; permits OPC-UA from the client only.                    |
 | `opcua-auth-asset`        | Transparent boundary + OPC-UA server requires credentials; anonymous sessions rejected.  |
 | `opcua-sec-policy`        | Transparent boundary + OPC-UA server requires Basic256Sha256_Sign; None policy rejected. |
+| `rate-limit`              | Per-source-IP hashlimit (3/min, burst 3); probe exhausts its bucket, client unaffected.  |
 
 
 ## Customisation
