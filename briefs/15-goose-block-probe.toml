@@ -1,0 +1,48 @@
+[brief]
+number = 15
+slug = "goose-block-probe"
+title = "IEC 61850 GOOSE block"
+requirement = """
+The probe can reach the boundary but its GOOSE trip frame must not reach
+the asset. The authorised client can still send GOOSE through.
+
+IEC 61850 GOOSE is the Layer 2 multicast protocol used for protection
+tripping in European substations. It carries no IP header; EtherType
+0x88B8 frames are addressed to the multicast MAC 01:0C:CD:01:xx:xx and
+cannot be IP-routed. The Industroyer module used in the 2016 Ukraine
+attack used this protocol to send spoofed trip messages to breaker
+controllers.
+
+Because GOOSE has no IP address and no port number, iptables cannot see
+it. The boundary runs a relay daemon that explicitly forwards EtherType
+0x88B8 frames between the north and south segments. The same relay is
+the control point: it reads a block list and drops frames from listed
+source MACs before forwarding.
+
+Both the probe (10.0.1.20) and the authorised client (10.0.1.10) sit on
+the north segment. Source-IP filtering is meaningless here — there are
+no IP headers. The defence is MAC-based: the probe's Ethernet address is
+added to the relay's block list. The client's address is not.
+"""
+
+[[brief.links]]
+title = "IEC 61850 GOOSE"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/iec-61850"
+
+[[brief.links]]
+title = "Ukraine grid incident (Industroyer)"
+url = "https://blue.tymyrddin.dev/docs/ot/incidents/ukraine-grid"
+
+[[checks]]
+runner = "probe"
+name = "goose-trip"
+script = "/checks/13-goose-trip.py"
+expect = "block"
+protocol = "iec-61850"
+
+[[checks]]
+runner = "client"
+name = "goose-client"
+script = "/checks/14-goose-client.py"
+expect = "pass"
+protocol = "iec-61850"

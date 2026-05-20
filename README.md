@@ -8,16 +8,19 @@ outcome must hold; the workbench tells you whether it does.
 
 ## What it is not
 
-A green scoreboard means the probe found no path through. It does not mean secure. The probe battery is finite, the asset is a simulation, and the
-workbench teaches the shape of a decision rather than the specifics of any particular
+A green scoreboard means the probe found no path through. It does not mean secure. The probe battery is finite, the
+asset is a simulation, and the workbench teaches the shape of a decision rather than the specifics of any particular
 vendor's appliance. That distinction is worth carrying from the start.
 
 ## The estate
 
 ```
 north segment 10.0.1.0/24          south segment 10.0.2.0/24
-  client  10.0.1.10                   asset  10.0.2.10:502 (Modbus)
-  probe   10.0.1.20                          10.0.2.10:1883 (MQTT)
+  client  10.0.1.10                   asset  10.0.2.10:502  (Modbus/TCP)
+  probe   10.0.1.20                          10.0.2.10:802  (Modbus/TLS)
+                                             10.0.2.10:1883 (MQTT)
+                                             10.0.2.10:2404 (IEC 104)
+                                             EtherType 0x88B8 (GOOSE)
                     boundary  north 10.0.1.1 / south 10.0.2.1
 ```
 
@@ -54,6 +57,12 @@ When a brief requires a new container image (a new check script is added to
 
 Only needed when adding new material.
 
+After a restart, re-activate any component that was active before. Container
+filesystems are wiped on restart; state written by `asset.sh` (such as brief 14's
+SA mode flag) does not survive. The boundary's iptables rules are also reset.
+Clicking Activate in the UI re-runs both `apply.sh` and `asset.sh` on the fresh
+containers.
+
 ## The web UI
 
 The web interface is the working surface. It has three sections.
@@ -77,70 +86,72 @@ boundary rules and clears results.
 
 ## The briefs
 
-Eight briefs form a ladder. Each introduces a new condition or attack vector and asks
-for a defence that holds.
+The briefs form a ladder. Each introduces new conditions and/or attack vectors and asks for a defence that holds.
 
-| # | Slug                    | Teaches                                                                                                       |
-|---|-------------------------|---------------------------------------------------------------------------------------------------------------|
-| 1 | block-probe             | Basic network segmentation: FORWARD DROP with a permit for the client.                                        |
-| 2 | write-one-setpoint      | Source allowlisting: permit by IP, introducing the assumption that breaks in brief 4.                         |
-| 3 | jump-host               | Topology control: close the direct path, proxy all connections through the boundary via DNAT.                 |
-| 4 | spoof-proof             | IP spoofing: the jump-host holds because it does not inspect source addresses.                                |
-| 5 | source-restricted-proxy | Tighten the proxy: restrict the DNAT rule to the authorised source so the probe cannot use the proxy at all.  |
-| 6 | modbus-write-filter     | Protocol-layer enforcement: iptables u32 drops write function codes regardless of source.                     |
-| 7 | graduated-access        | Graduated access: reads open to all, writes gated to the authorised host.                                     |
-| 8 | layered-defence         | Defence in depth: source restriction and function code filter are independent; both must fail simultaneously. |
-| 9 | mqtt-block-probe        | Protocol breadth: same segmentation principle applied to MQTT; no auth, wildcard subscribe, command publish.  |
+| #  | Slug                    | Teaches                                                                                                        |
+|----|-------------------------|----------------------------------------------------------------------------------------------------------------|
+| 1  | block-probe             | Basic network segmentation: FORWARD DROP with a permit for the client.                                         |
+| 2  | write-one-setpoint      | Source allowlisting: permit by IP, introducing the assumption that breaks in brief 4.                          |
+| 3  | jump-host               | Topology control: close the direct path, proxy all connections through the boundary via DNAT.                  |
+| 4  | spoof-proof             | IP spoofing: the jump-host holds because it does not inspect source addresses.                                 |
+| 5  | source-restricted-proxy | Tighten the proxy: restrict the DNAT rule to the authorised source so the probe cannot use the proxy at all.   |
+| 6  | modbus-write-filter     | Protocol-layer enforcement: iptables u32 drops write function codes regardless of source.                      |
+| 7  | graduated-access        | Graduated access: reads open to all, writes gated to the authorised host.                                      |
+| 8  | layered-defence         | Defence in depth: source restriction and function code filter are independent; both must fail simultaneously.  |
+| 9  | modbus-tls              | Upgrade the transport: block plain port 502, serve Modbus/TLS on 802; client connects with TLS.                |
+| 10 | mqtt-block-probe        | Protocol breadth: same segmentation principle applied to MQTT; no auth, wildcard subscribe, command publish.   |
+| 11 | mqtt-auth               | Application-layer auth: boundary transparent, mosquitto rejects anonymous CONNECT with rc=5.                   |
+| 12 | iec104-block-probe      | Ukraine 2015/2016: block IEC 104 (port 2404) from the probe; C_SC_NA_1 trip command as the adversary payload.  |
+| 13 | iec104-command-filter   | Protocol-layer enforcement: u32 rejects C_SC_NA_1 (0x2D) on the ASDU type byte; connect and STARTDT pass.      |
+| 14 | iec104-sa               | Application-layer auth: IEC 62351-5 SA on the asset rejects unauthenticated commands; boundary is transparent. |
+| 15 | goose-block-probe       | Layer 2 enforcement: GOOSE trip blocked at the relay by source MAC; iptables cannot see it.                    |
 
 ## The components
 
 Each component lives in `components/<name>/apply.sh`. Activating a component copies
-the script to the boundary container and executes it. `remove.sh` is called when the
-component is flushed.
+the script to the boundary container and executes it. Components may also include
+`asset.sh` to configure the asset container directly (used by briefs 11 and 14). `remove.sh`
+and `asset-remove.sh` are called when the component is flushed.
 
-| Component                 | What it does                                                                        |
-|---------------------------|-------------------------------------------------------------------------------------|
-| `packet-filter`           | FORWARD DROP with commented permit rules to fill in.                                |
-| `client-allowlist`        | Permits the client's IP through, drops everything else.                             |
-| `jump-host`               | DNAT proxy: redirects port 502 to the asset, no source restriction.                 |
-| `source-restricted-proxy` | DNAT proxy restricted to the client's source address.                               |
-| `modbus-write-filter`     | Jump-host base with u32 rules blocking all Modbus write FCs.                        |
-| `graduated-access`        | Open DNAT proxy with write FCs blocked for all sources except the client.           |
-| `layered-defence`         | Source-restricted DNAT combined with write FC filter as a second independent layer. |
-| `mqtt-port-filter`        | Blocks port 1883 from the probe; permits MQTT from the client only.                 |
+| Component                 | What it does                                                                           |
+|---------------------------|----------------------------------------------------------------------------------------|
+| `packet-filter`           | FORWARD DROP with commented permit rules to fill in.                                   |
+| `client-allowlist`        | Permits the client's IP through, drops everything else.                                |
+| `jump-host`               | DNAT proxy: redirects port 502 to the asset, no source restriction.                    |
+| `source-restricted-proxy` | DNAT proxy restricted to the client's source address.                                  |
+| `modbus-write-filter`     | Jump-host base with u32 rules blocking all Modbus write FCs.                           |
+| `graduated-access`        | Open DNAT proxy with write FCs blocked for all sources except the client.              |
+| `layered-defence`         | Source-restricted DNAT combined with write FC filter as a second independent layer.    |
+| `modbus-tls`              | Blocks port 502 from all; allows port 802 (Modbus/TLS) from client only.               |
+| `mqtt-port-filter`        | Blocks port 1883 from the probe; permits MQTT from the client only.                    |
+| `mqtt-auth`               | Transparent boundary + mosquitto password auth; anonymous connects rejected.           |
+| `iec104-port-filter`      | Blocks port 2404 from the probe; permits IEC 104 from the client only.                 |
+| `iec104-command-filter`   | Rejects IEC 104 C_SC_NA_1 (type 0x2D) via u32; connect and STARTDT pass.               |
+| `iec104-sa-asset`         | Transparent boundary + IEC 62351-5 SA on the asset; unauthenticated commands rejected. |
+| `goose-block-probe`       | Adds probe MAC to the boundary's GOOSE relay block list; client GOOSE passes.          |
 
-## Custom probes
 
-Write a probe script in the New probe section of the UI, assign it a protocol and
-name, and save. It appears in the protocol tab alongside brief checks. Custom probes
-run when selected and their results appear in the CUSTOM PROBES section of the results
-table. They do not affect the HELD/OPEN headline.
+## Customisation
 
-Saved probes live in `probe/custom/<protocol>/<name>.py`. The template at
-`probe/custom/_template.py` is the starting point.
+Custom probes and custom filters let you work outside the fixed brief ladder.
+Write a probe to test a hypothesis, write a filter to try a rule, run them
+against each other to see what holds.
 
-## Project layout
+**Custom probes.** Write a script in the New probe section, assign it a protocol
+and name, save. It appears in the protocol tab alongside brief checks and runs
+inside the probe container when selected. Results appear in the CUSTOM PROBES
+section of the results table and do not affect the HELD/OPEN headline. Saved
+probes live in `probe/custom/<protocol>/<name>.py`; the template at
+`probe/custom/_template.py` is the starting point. No lab restart needed.
 
-```
-topology.clab.yml
-asset/                          Modbus/TCP server image
-boundary/                       boundary node image
-client/
-  checks/                       check scripts run from the client container
-probe/
-  checks/                       check scripts run from the probe container
-  custom/                       participant-written probes, organised by protocol
-components/<name>/
-  apply.sh                      iptables rules applied to the boundary
-  remove.sh                     flush script
-briefs/<nn>-<slug>.toml         brief definition: requirement, links, expected checks
-web/
-  app.py                        Flask application
-  templates/index.html
-  static/
-lab                             CLI: up / down
-requirements.txt
-```
+**Custom filters.** Write a filter script in the Firewall Rules editor, give it
+a name, save or activate it directly. Saved components appear alongside the
+built-in ones; activating one pushes its `apply.sh` to the boundary container.
+Saved components live in `components/<name>/apply.sh`. The address comment at
+the top of any built-in `apply.sh` is a reference for IP assignments.
+
+For anything beyond iptables rules on the boundary, new check scripts, new
+protocols, new asset behaviour, see [README-tech.md](README-tech.md).
 
 ## How it sits with the rest of the site
 

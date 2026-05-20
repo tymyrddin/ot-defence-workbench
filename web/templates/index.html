@@ -19,7 +19,8 @@
     {% if headline %}
     <span class="badge {% if headline == 'HELD' %}bg-success{% else %}bg-danger{% endif %} fs-6">{{ headline }}</span>
     {% endif %}
-    <form action="/reset" method="post" class="mb-0">
+    <form action="/reset" method="post" class="mb-0"
+          onsubmit="return confirm('Reset to brief 1? This clears all rules, asset state, and results.')">
       <button class="btn btn-sm btn-outline-secondary">Reset bench</button>
     </form>
     {% if brief_num > 1 %}
@@ -211,7 +212,7 @@
         <div class="item-actions mt-2">
           {% if comp.name in applied %}
           <button type="button" class="btn btn-sm btn-primary"
-                  onclick="reapplyComp(this, '{{ comp.name }}')">Update</button>
+                  onclick="reapplyComp(this, '{{ comp.name }}')">Re-activate</button>
           {% else %}
           <button type="button" class="btn btn-sm btn-primary"
                   onclick="post('/apply-component/{{ comp.name }}', {})">Activate</button>

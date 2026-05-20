@@ -21,4 +21,5 @@ ip link set eth2 up
 echo 1 > /proc/sys/net/ipv4/ip_forward
 iptables -P FORWARD ACCEPT
 
+python3 /app/goose-relay.py &
 exec "$@"

@@ -1,0 +1,1 @@
+Filter IEC 104 C_SC_NA_1 (type 0x2D) commands; connect and STARTDT pass

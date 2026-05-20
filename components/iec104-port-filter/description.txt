@@ -1,0 +1,1 @@
+Block port 2404 from the probe; allow IEC 104 from the client only

@@ -16,6 +16,7 @@ LAB_NAME = "ot-defence-workbench"
 BOUNDARY = f"clab-{LAB_NAME}-boundary"
 PROBE = f"clab-{LAB_NAME}-probe"
 CLIENT = f"clab-{LAB_NAME}-client"
+ASSET = f"clab-{LAB_NAME}-asset"
 RUNNER_CONTAINER = {"probe": PROBE, "client": CLIENT}
 RUNNER_DIR = {"probe": LAB_DIR / "probe", "client": LAB_DIR / "client"}
 
@@ -255,7 +256,18 @@ def check():
 
 def _flush_applied():
     for name in list(get_applied()):
-        remove_sh = LAB_DIR / "components" / name / "remove.sh"
+        comp_dir = LAB_DIR / "components" / name
+        asset_remove = comp_dir / "asset-remove.sh"
+        if asset_remove.exists():
+            subprocess.run(
+                ["docker", "cp", str(asset_remove), f"{ASSET}:/tmp/asset-remove.sh"],
+                capture_output=True,
+            )
+            subprocess.run(
+                ["docker", "exec", ASSET, "/bin/sh", "/tmp/asset-remove.sh"],
+                capture_output=True,
+            )
+        remove_sh = comp_dir / "remove.sh"
         if remove_sh.exists():
             subprocess.run(
                 ["docker", "cp", str(remove_sh), f"{BOUNDARY}:/tmp/component-remove.sh"],
@@ -271,6 +283,22 @@ def _write_script(path, code):
     path.chmod(0o755)
 
 
+def _apply_component_scripts(name):
+    """Copy and run apply.sh on boundary, and asset.sh on asset if present."""
+    comp_dir = LAB_DIR / "components" / name
+    apply_sh = comp_dir / "apply.sh"
+    subprocess.run(
+        ["docker", "cp", str(apply_sh), f"{BOUNDARY}:/tmp/component-apply.sh"], check=True
+    )
+    subprocess.run(["docker", "exec", BOUNDARY, "/bin/sh", "/tmp/component-apply.sh"])
+    asset_sh = comp_dir / "asset.sh"
+    if asset_sh.exists():
+        subprocess.run(
+            ["docker", "cp", str(asset_sh), f"{ASSET}:/tmp/asset-apply.sh"], check=True
+        )
+        subprocess.run(["docker", "exec", ASSET, "/bin/sh", "/tmp/asset-apply.sh"])
+
+
 @app.route("/apply-component/<name>", methods=["POST"])
 def apply_component(name):
     """Apply a saved component by name, flushing whatever is current."""
@@ -279,10 +307,7 @@ def apply_component(name):
         flash(f"No apply.sh for: {name}")
         return redirect(url_for("index"))
     _flush_applied()
-    subprocess.run(
-        ["docker", "cp", str(apply_sh), f"{BOUNDARY}:/tmp/component-apply.sh"], check=True
-    )
-    subprocess.run(["docker", "exec", BOUNDARY, "/bin/sh", "/tmp/component-apply.sh"])
+    _apply_component_scripts(name)
     APPLIED_FILE.write_text(name)
     return redirect(url_for("index"))
 
@@ -302,10 +327,7 @@ def build_and_apply():
     if not remove_sh.exists():
         _write_script(remove_sh, DEFAULT_REMOVE)
     _flush_applied()
-    subprocess.run(
-        ["docker", "cp", str(apply_sh), f"{BOUNDARY}:/tmp/component-apply.sh"], check=True
-    )
-    subprocess.run(["docker", "exec", BOUNDARY, "/bin/sh", "/tmp/component-apply.sh"])
+    _apply_component_scripts(name)
     APPLIED_FILE.write_text(name)
     return redirect(url_for("index"))
 
@@ -316,22 +338,29 @@ def build():
     if not component:
         flash("Select a component first.")
         return redirect(url_for("index"))
-    apply_sh = LAB_DIR / "components" / component / "apply.sh"
-    if not apply_sh.exists():
+    if not (LAB_DIR / "components" / component / "apply.sh").exists():
         flash(f"No apply.sh for: {component}")
         return redirect(url_for("index"))
     _flush_applied()
-    subprocess.run(
-        ["docker", "cp", str(apply_sh), f"{BOUNDARY}:/tmp/component-apply.sh"], check=True
-    )
-    subprocess.run(["docker", "exec", BOUNDARY, "/bin/sh", "/tmp/component-apply.sh"])
+    _apply_component_scripts(component)
     APPLIED_FILE.write_text(component)
     return redirect(url_for("index"))
 
 
 @app.route("/remove/<name>", methods=["POST"])
 def remove(name):
-    remove_sh = LAB_DIR / "components" / name / "remove.sh"
+    comp_dir = LAB_DIR / "components" / name
+    asset_remove = comp_dir / "asset-remove.sh"
+    if asset_remove.exists():
+        subprocess.run(
+            ["docker", "cp", str(asset_remove), f"{ASSET}:/tmp/asset-remove.sh"],
+            capture_output=True,
+        )
+        subprocess.run(
+            ["docker", "exec", ASSET, "/bin/sh", "/tmp/asset-remove.sh"],
+            capture_output=True,
+        )
+    remove_sh = comp_dir / "remove.sh"
     if remove_sh.exists():
         subprocess.run(
             ["docker", "cp", str(remove_sh), f"{BOUNDARY}:/tmp/component-remove.sh"], check=True
@@ -345,6 +374,7 @@ def remove(name):
 
 @app.route("/reset", methods=["POST"])
 def reset():
+    _flush_applied()
     r = subprocess.run(
         ["docker", "exec", BOUNDARY, "/bin/sh", "-c",
          "iptables -F FORWARD && iptables -P FORWARD ACCEPT && iptables -t nat -F PREROUTING && iptables -t nat -F POSTROUTING"],
@@ -352,9 +382,19 @@ def reset():
     )
     if r.returncode != 0:
         flash(f"Reset failed (is the lab running?): {r.stderr.decode().strip()}")
-    APPLIED_FILE.write_text("")
     RESULTS_FILE.unlink(missing_ok=True)
+    BRIEF_FILE.write_text("1")
     return redirect(url_for("index"))
+
+
+def _nav_reset():
+    """Flush applied components (including asset state) and reset all iptables."""
+    _flush_applied()
+    RESULTS_FILE.unlink(missing_ok=True)
+    subprocess.run(
+        ["docker", "exec", BOUNDARY, "/bin/sh", "-c",
+         "iptables -F FORWARD && iptables -P FORWARD ACCEPT && iptables -t nat -F PREROUTING && iptables -t nat -F POSTROUTING"]
+    )
 
 
 @app.route("/prev", methods=["POST"])
@@ -363,13 +403,8 @@ def prev_brief():
     if n <= 1:
         flash("Already at the first brief.")
         return redirect(url_for("index"))
+    _nav_reset()
     BRIEF_FILE.write_text(str(n - 1))
-    APPLIED_FILE.write_text("")
-    RESULTS_FILE.unlink(missing_ok=True)
-    subprocess.run(
-        ["docker", "exec", BOUNDARY, "/bin/sh", "-c",
-         "iptables -F FORWARD && iptables -P FORWARD ACCEPT && iptables -t nat -F PREROUTING && iptables -t nat -F POSTROUTING"]
-    )
     return redirect(url_for("index"))
 
 
@@ -379,13 +414,8 @@ def next_brief():
     if not glob.glob(str(LAB_DIR / "briefs" / f"{n+1:02d}-*.toml")):
         flash("End of ladder.")
         return redirect(url_for("index"))
+    _nav_reset()
     BRIEF_FILE.write_text(str(n + 1))
-    APPLIED_FILE.write_text("")
-    RESULTS_FILE.unlink(missing_ok=True)
-    subprocess.run(
-        ["docker", "exec", BOUNDARY, "/bin/sh", "-c",
-         "iptables -F FORWARD && iptables -P FORWARD ACCEPT && iptables -t nat -F PREROUTING && iptables -t nat -F POSTROUTING"]
-    )
     return redirect(url_for("index"))
 
 

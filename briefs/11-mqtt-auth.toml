@@ -1,0 +1,50 @@
+[brief]
+number = 11
+slug = "mqtt-auth"
+title = "MQTT broker password auth"
+requirement = """
+The probe can reach port 1883 but cannot connect to the broker. The client
+connects with valid credentials and receives process data.
+
+Brief 10 placed a boundary rule that dropped the probe's MQTT packets.
+This brief takes a different approach: the boundary is transparent, and the
+broker itself rejects unauthenticated connections. The probe completes the
+TCP handshake, sends a CONNECT packet, and receives CONNACK code 5
+(not authorised). The TCP port is open; the defence is at the application layer.
+
+The asset switches mosquitto to require username/password authentication.
+This is the application-layer analogue of brief 10's network-layer block:
+the same probe is stopped, by a different mechanism, at a different layer.
+"""
+
+[[brief.links]]
+title = "MQTT"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/mqtt"
+
+[[checks]]
+runner = "probe"
+name = "mqtt-connect"
+script = "/checks/07-mqtt-connect.py"
+expect = "pass"
+protocol = "mqtt"
+
+[[checks]]
+runner = "probe"
+name = "mqtt-subscribe"
+script = "/checks/08-mqtt-subscribe.py"
+expect = "block"
+protocol = "mqtt"
+
+[[checks]]
+runner = "probe"
+name = "mqtt-publish"
+script = "/checks/09-mqtt-publish.py"
+expect = "block"
+protocol = "mqtt"
+
+[[checks]]
+runner = "client"
+name = "mqtt-auth-client"
+script = "/checks/09-mqtt-auth-client.py"
+expect = "pass"
+protocol = "mqtt"

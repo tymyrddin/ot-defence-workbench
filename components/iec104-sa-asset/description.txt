@@ -1,0 +1,1 @@
+Transparent boundary; IEC 62351-5 SA (HMAC) validation on the asset rejects unauthenticated commands

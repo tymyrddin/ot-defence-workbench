@@ -1,0 +1,1 @@
+Block plain Modbus port 502; allow TLS port 802 from client only

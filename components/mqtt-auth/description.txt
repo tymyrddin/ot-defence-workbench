@@ -1,0 +1,1 @@
+Enable mosquitto password auth; anonymous connects rejected at application layer

@@ -1,5 +1,5 @@
 [brief]
-number = 9
+number = 10
 slug = "mqtt-block-probe"
 title = "Block the MQTT probe"
 requirement = """

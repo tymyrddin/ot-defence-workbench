@@ -1,0 +1,38 @@
+[brief]
+number = 9
+slug = "modbus-tls"
+title = "Modbus/TLS upgrade"
+requirement = """
+The probe cannot reach the asset on port 502. The client connects on port
+802 (Modbus/TLS, RFC 8184) and reads registers through the TLS channel.
+
+Blocking port 502 cuts all hosts from the plaintext register map. Modbus/TLS
+adds a cryptographic transport so the asset can serve legitimate clients
+while the plaintext port remains closed to everyone.
+
+The asset runs two Modbus listeners: the original plain-TCP server on 502
+and a TLS server on 802. The boundary blocks port 502 from the probe and
+allows only port 802 from the authorised client.
+
+This teaches the "upgrade the transport" path: restrict the plaintext
+protocol at the boundary, provide a cryptographic alternative for legitimate
+clients. The same pattern applies to any protocol with a defined TLS variant.
+"""
+
+[[brief.links]]
+title = "Modbus TLS (RFC 8184)"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/modbus"
+
+[[checks]]
+runner = "probe"
+name = "modbus-direct"
+script = "/checks/01-direct-reach.py"
+expect = "block"
+protocol = "modbus"
+
+[[checks]]
+runner = "client"
+name = "modbus-tls-client"
+script = "/checks/08-modbus-tls-client.py"
+expect = "pass"
+protocol = "modbus"

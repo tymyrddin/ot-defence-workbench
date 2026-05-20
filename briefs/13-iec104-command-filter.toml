@@ -1,0 +1,66 @@
+[brief]
+number = 13
+slug = "iec104-command-filter"
+title = "IEC 104 command filter"
+requirement = """
+The probe can reach the controller and complete the STARTDT handshake.
+Its C_SC_NA_1 circuit-breaker trip command is rejected. The session is not
+blocked — only that command type is.
+
+Blocking the port entirely (brief 10) is the bluntest tool available. On a
+segment where the client and probe share a subnet, it also blocks any
+monitoring session from a host that is not on the allowlist.
+
+The IEC 104 APDU carries a one-byte type ID at offset 6 of the TCP payload
+(bytes 0-1 are start and length, bytes 2-5 are the control field). The
+iptables u32 module navigates the variable-length IP and TCP headers and
+reads that byte directly — no proxy, no application-layer parser on the
+boundary. C_SC_NA_1 has type ID 0x2D (45). Any packet to port 2404 whose
+payload carries that value is rejected with a TCP RST before any ACCEPT rule
+sees it, including the ESTABLISHED,RELATED rule that would otherwise pass it
+as part of an existing session.
+
+STARTDT and TESTFR U-frames are six bytes. The u32 expression reads byte 6;
+a six-byte payload has no byte 6. The match fails silently and those frames
+pass unaffected.
+"""
+
+[[brief.links]]
+title = "IEC 60870-5-104"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/iec-60870-5-104"
+
+[[brief.links]]
+title = "Ukraine grid incident"
+url = "https://blue.tymyrddin.dev/docs/ot/incidents/ukraine-grid"
+
+[[brief.links]]
+title = "IT/OT boundary"
+url = "https://blue.tymyrddin.dev/docs/ot/architecture/boundary"
+
+[[checks]]
+runner = "probe"
+name = "iec104-connect"
+script = "/checks/10-iec104-connect.py"
+expect = "pass"
+protocol = "iec-60870-5-104"
+
+[[checks]]
+runner = "probe"
+name = "iec104-startdt"
+script = "/checks/11-iec104-startdt.py"
+expect = "pass"
+protocol = "iec-60870-5-104"
+
+[[checks]]
+runner = "probe"
+name = "iec104-command"
+script = "/checks/12-iec104-command.py"
+expect = "block"
+protocol = "iec-60870-5-104"
+
+[[checks]]
+runner = "client"
+name = "iec104-client"
+script = "/checks/07-iec104-client.py"
+expect = "pass"
+protocol = "iec-60870-5-104"

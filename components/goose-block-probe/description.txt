@@ -1,0 +1,1 @@
+Block GOOSE trip frames from the probe at the Layer 2 relay; client GOOSE passes

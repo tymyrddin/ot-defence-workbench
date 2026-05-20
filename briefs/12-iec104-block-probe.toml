@@ -1,0 +1,65 @@
+[brief]
+number = 12
+slug = "iec104-block-probe"
+title = "Block the IEC 104 probe"
+requirement = """
+The probe cannot reach the substation controller. The client's monitoring
+connection still succeeds.
+
+The controller listens on port 2404. IEC 60870-5-104 carries no authentication
+in its base specification. Any host that completes the STARTDT handshake is
+treated as an authorised master station and may send control commands directly
+to field devices — including C_SC_NA_1, a single command that opens or closes
+a circuit breaker.
+
+In December 2015, Sandworm operators reached distribution substations across
+three Ukrainian oblasts over plain IEC 104 sessions and sent commands to open
+breakers. Around 230,000 customers lost power. In December 2016, Industroyer
+automated the same attack: a dedicated payload enumerated IOAs and issued trip
+commands without any credential exchange.
+
+No exploit. No credential. The protocol accepted the commands because the
+station answered the phone.
+
+The network is the only enforcement point available here.
+"""
+
+[[brief.links]]
+title = "IEC 60870-5-104"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/iec-60870-5-104"
+
+[[brief.links]]
+title = "Ukraine grid incident"
+url = "https://blue.tymyrddin.dev/docs/ot/incidents/ukraine-grid"
+
+[[brief.links]]
+title = "IT/OT boundary"
+url = "https://blue.tymyrddin.dev/docs/ot/architecture/boundary"
+
+[[checks]]
+runner = "probe"
+name = "iec104-connect"
+script = "/checks/10-iec104-connect.py"
+expect = "block"
+protocol = "iec-60870-5-104"
+
+[[checks]]
+runner = "probe"
+name = "iec104-startdt"
+script = "/checks/11-iec104-startdt.py"
+expect = "block"
+protocol = "iec-60870-5-104"
+
+[[checks]]
+runner = "probe"
+name = "iec104-command"
+script = "/checks/12-iec104-command.py"
+expect = "block"
+protocol = "iec-60870-5-104"
+
+[[checks]]
+runner = "client"
+name = "iec104-client"
+script = "/checks/07-iec104-client.py"
+expect = "pass"
+protocol = "iec-60870-5-104"
