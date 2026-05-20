@@ -119,26 +119,26 @@ the script to the boundary container and executes it. Components may also includ
 `asset.sh` to configure the asset container directly (used by briefs 11, 14, 19, and 20). `remove.sh`
 and `asset-remove.sh` are called when the component is flushed.
 
-| Component                 | What it does                                                                           |
-|---------------------------|----------------------------------------------------------------------------------------|
-| `packet-filter`           | FORWARD DROP with commented permit rules to fill in.                                   |
-| `client-allowlist`        | Permits the client's IP through, drops everything else.                                |
-| `jump-host`               | DNAT proxy: redirects port 502 to the asset, no source restriction.                    |
-| `source-restricted-proxy` | DNAT proxy restricted to the client's source address.                                  |
-| `modbus-write-filter`     | Jump-host base with u32 rules blocking all Modbus write FCs.                           |
-| `graduated-access`        | Open DNAT proxy with write FCs blocked for all sources except the client.              |
-| `layered-defence`         | Source-restricted DNAT combined with write FC filter as a second independent layer.    |
-| `modbus-tls`              | Blocks port 502 from all; allows port 802 (Modbus/TLS) from client only.               |
-| `mqtt-port-filter`        | Blocks port 1883 from the probe; permits MQTT from the client only.                    |
-| `mqtt-auth`               | Transparent boundary + mosquitto password auth; anonymous connects rejected.           |
-| `goose-trip-filter`       | Relay drops GOOSE frames with allData BOOLEAN TRUE (trip); cancel frames pass.         |
-| `goose-sa-asset`          | Transparent boundary + IEC 62351-6 SA on asset; unsigned GOOSE frames rejected.        |
-| `iec104-port-filter`      | Blocks port 2404 from the probe; permits IEC 104 from the client only.                 |
-| `iec104-command-filter`   | Rejects IEC 104 C_SC_NA_1 (type 0x2D) via u32; connect and STARTDT pass.               |
-| `iec104-sa-asset`         | Transparent boundary + IEC 62351-5 SA on the asset; unauthenticated commands rejected. |
-| `goose-block-probe`       | Adds probe MAC to the boundary's GOOSE relay block list; client GOOSE passes.          |
-| `opcua-port-filter`       | Blocks port 4840 from the probe; permits OPC-UA from the client only.                  |
-| `opcua-auth-asset`        | Transparent boundary + OPC-UA server requires credentials; anonymous sessions rejected. |
+| Component                 | What it does                                                                             |
+|---------------------------|------------------------------------------------------------------------------------------|
+| `packet-filter`           | FORWARD DROP with commented permit rules to fill in.                                     |
+| `client-allowlist`        | Permits the client's IP through, drops everything else.                                  |
+| `jump-host`               | DNAT proxy: redirects port 502 to the asset, no source restriction.                      |
+| `source-restricted-proxy` | DNAT proxy restricted to the client's source address.                                    |
+| `modbus-write-filter`     | Jump-host base with u32 rules blocking all Modbus write FCs.                             |
+| `graduated-access`        | Open DNAT proxy with write FCs blocked for all sources except the client.                |
+| `layered-defence`         | Source-restricted DNAT combined with write FC filter as a second independent layer.      |
+| `modbus-tls`              | Blocks port 502 from all; allows port 802 (Modbus/TLS) from client only.                 |
+| `mqtt-port-filter`        | Blocks port 1883 from the probe; permits MQTT from the client only.                      |
+| `mqtt-auth`               | Transparent boundary + mosquitto password auth; anonymous connects rejected.             |
+| `goose-trip-filter`       | Relay drops GOOSE frames with allData BOOLEAN TRUE (trip); cancel frames pass.           |
+| `goose-sa-asset`          | Transparent boundary + IEC 62351-6 SA on asset; unsigned GOOSE frames rejected.          |
+| `iec104-port-filter`      | Blocks port 2404 from the probe; permits IEC 104 from the client only.                   |
+| `iec104-command-filter`   | Rejects IEC 104 C_SC_NA_1 (type 0x2D) via u32; connect and STARTDT pass.                 |
+| `iec104-sa-asset`         | Transparent boundary + IEC 62351-5 SA on the asset; unauthenticated commands rejected.   |
+| `goose-block-probe`       | Adds probe MAC to the boundary's GOOSE relay block list; client GOOSE passes.            |
+| `opcua-port-filter`       | Blocks port 4840 from the probe; permits OPC-UA from the client only.                    |
+| `opcua-auth-asset`        | Transparent boundary + OPC-UA server requires credentials; anonymous sessions rejected.  |
 | `opcua-sec-policy`        | Transparent boundary + OPC-UA server requires Basic256Sha256_Sign; None policy rejected. |
 
 
