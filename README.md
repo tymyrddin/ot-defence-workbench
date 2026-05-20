@@ -166,9 +166,12 @@ the top of any built-in `apply.sh` is a reference for IP assignments.
 For anything beyond iptables rules on the boundary, new check scripts, new
 protocols, new asset behaviour, see [README-tech.md](README-tech.md).
 
-## How it sits with the rest of the site
+## Notes
 
-The [blue documentation](https://blue.tymyrddin.dev/docs/ot/) covers the per-protocol
-security recipes and the architecture patterns. The workbench makes those decisions
-executable: each brief links to a relevant doc page, and each component is the
-iptables translation of a pattern described there.
+The [blue documentation](https://blue.tymyrddin.dev/docs/ot/) covers the per-protocol security recipes and the 
+architecture patterns. The workbench makes those decisions executable: each brief links to a relevant doc page, and 
+each component is the iptables translation of a pattern described there.
+
+The workbench is prevention-focused. No brief asks the boundary to hold the line while also generating
+evidence. Detection and alerting are a different class of tool. The HELD/OPEN verdict records whether
+traffic passed; what was logged is not measured.
