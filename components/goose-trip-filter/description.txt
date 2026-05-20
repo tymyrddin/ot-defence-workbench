@@ -1,0 +1,1 @@
+Relay drops GOOSE frames with allData BOOLEAN TRUE (trip); cancel frames pass

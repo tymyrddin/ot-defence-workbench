@@ -105,6 +105,8 @@ The briefs form a ladder. Each introduces new conditions and/or attack vectors a
 | 13 | iec104-command-filter   | Protocol-layer enforcement: u32 rejects C_SC_NA_1 (0x2D) on the ASDU type byte; connect and STARTDT pass.      |
 | 14 | iec104-sa               | Application-layer auth: IEC 62351-5 SA on the asset rejects unauthenticated commands; boundary is transparent. |
 | 15 | goose-block-probe       | Layer 2 enforcement: GOOSE trip blocked at the relay by source MAC; iptables cannot see it.                    |
+| 16 | goose-trip-filter       | Content filter: relay parses allData BER field and drops BOOLEAN TRUE (trip); cancel frames pass.              |
+| 17 | goose-sa                | Application-layer auth: IEC 62351-6 SA on the asset; unsigned GOOSE frames dropped, no echo.                   |
 
 ## The components
 
@@ -125,6 +127,8 @@ and `asset-remove.sh` are called when the component is flushed.
 | `modbus-tls`              | Blocks port 502 from all; allows port 802 (Modbus/TLS) from client only.               |
 | `mqtt-port-filter`        | Blocks port 1883 from the probe; permits MQTT from the client only.                    |
 | `mqtt-auth`               | Transparent boundary + mosquitto password auth; anonymous connects rejected.           |
+| `goose-trip-filter`       | Relay drops GOOSE frames with allData BOOLEAN TRUE (trip); cancel frames pass.         |
+| `goose-sa-asset`          | Transparent boundary + IEC 62351-6 SA on asset; unsigned GOOSE frames rejected.        |
 | `iec104-port-filter`      | Blocks port 2404 from the probe; permits IEC 104 from the client only.                 |
 | `iec104-command-filter`   | Rejects IEC 104 C_SC_NA_1 (type 0x2D) via u32; connect and STARTDT pass.               |
 | `iec104-sa-asset`         | Transparent boundary + IEC 62351-5 SA on the asset; unauthenticated commands rejected. |

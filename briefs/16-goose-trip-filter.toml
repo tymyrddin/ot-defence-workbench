@@ -1,0 +1,40 @@
+[brief]
+number = 16
+slug = "goose-trip-filter"
+title = "GOOSE trip filter"
+requirement = """
+The probe's GOOSE trip command must not reach the asset. The client can still
+send GOOSE cancel (normal state) frames through.
+
+Brief 15 blocked the probe by source MAC — a coarse measure that stops all
+GOOSE from a known host. This brief takes a different approach: the relay
+inspects the ASN.1 allData field and drops any frame whose first entry is
+BOOLEAN TRUE (execute). BOOLEAN FALSE (cancel) passes from any source.
+
+The relay walks the BER-encoded GOOSE PDU to locate the allData sequence,
+then reads the first data entry. A trip command contains BOOLEAN TRUE; a
+cancel or normal-state publish contains BOOLEAN FALSE. The relay drops the
+former and forwards the latter, regardless of source address.
+
+This is the GOOSE analogue of brief 13 (IEC 104 type ID filter): the probe
+may send GOOSE frames freely, but the execute payload is removed at the relay
+before it can reach field devices.
+"""
+
+[[brief.links]]
+title = "IEC 61850 GOOSE"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/iec-61850"
+
+[[checks]]
+runner = "probe"
+name = "goose-trip"
+script = "/checks/13-goose-trip.py"
+expect = "block"
+protocol = "iec-61850"
+
+[[checks]]
+runner = "client"
+name = "goose-cancel"
+script = "/checks/15-goose-cancel-client.py"
+expect = "pass"
+protocol = "iec-61850"

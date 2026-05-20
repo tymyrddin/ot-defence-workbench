@@ -1,0 +1,49 @@
+[brief]
+number = 17
+slug = "goose-sa"
+title = "GOOSE security authentication (IEC 62351-6)"
+requirement = """
+The probe's unsigned GOOSE trip must not produce an echo. The client's
+signed GOOSE trip is validated and echoed by the asset.
+
+Briefs 15 and 16 enforce controls at the relay: source MAC filtering and
+content-based trip filtering. This brief moves the enforcement to the asset
+itself. The boundary is transparent; the relay forwards all GOOSE frames
+without inspection.
+
+The asset validates an HMAC-SHA256 MAC appended after the GOOSE PDU. Frames
+with no MAC or an invalid MAC are silently dropped — no echo. The authorised
+client appends a correct MAC; the asset validates and echoes.
+
+The probe's unsigned frame reaches the asset. The asset checks the Length
+field in the GOOSE application header to determine whether a MAC is present:
+if the frame is exactly Length+14+4 bytes long, the last 4 bytes are taken as
+the MAC. A truncated HMAC-SHA256 over the GOOSE PDU is computed and compared.
+If the MAC is absent or wrong, no echo. If correct, the asset echoes.
+
+This is the GOOSE analogue of brief 14 (IEC 62351-5 SA for IEC 104).
+Completes the three-layer GOOSE story:
+  relay MAC block (15) → relay trip filter (16) → asset SA (17)
+"""
+
+[[brief.links]]
+title = "IEC 61850 GOOSE"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/iec-61850"
+
+[[brief.links]]
+title = "IEC 62351-6"
+url = "https://blue.tymyrddin.dev/docs/ot/protocols/iec-61850"
+
+[[checks]]
+runner = "probe"
+name = "goose-trip"
+script = "/checks/13-goose-trip.py"
+expect = "block"
+protocol = "iec-61850"
+
+[[checks]]
+runner = "client"
+name = "goose-sa-client"
+script = "/checks/16-goose-sa-client.py"
+expect = "pass"
+protocol = "iec-61850"

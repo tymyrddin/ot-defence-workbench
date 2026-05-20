@@ -2,30 +2,7 @@
 
 Possible directions. Grouped by what they teach and what they require.
 
-The ladder currently ends at brief 15 (goose-block-probe).
-
----
-
-## Complete the GOOSE ladder
-
-Brief 15 blocks the probe's GOOSE at the relay by source MAC — the port-level
-analogue (compare brief 12). Two natural extensions follow the same three-layer
-pattern already established for IEC 104.
-
-**Brief 16: GOOSE trip filter**
-The probe can send GOOSE frames; only trip commands are blocked. The relay
-inspects the ASN.1 `allData` field: if the first entry is BOOLEAN TRUE (execute),
-drop the frame; BOOLEAN FALSE (normal/cancel) passes. This is the GOOSE analogue
-of brief 13 (IEC 104 type ID filter). Requires the relay to parse enough of the
-GOOSE PDU to reach `allData` — about 20 lines of BER walking.
-
-**Brief 17: GOOSE security authentication (IEC 62351-6)**
-Boundary transparent; asset validates HMAC-SHA256 on received GOOSE frames.
-Probe sends unsigned GOOSE → asset's `goose-server.py` finds no MAC, closes.
-Client sends signed GOOSE → asset validates and echoes. Mechanically identical to
-brief 14 (IEC 62351-5 SA for IEC 104): same `asset.sh` toggle pattern, same
-shared-key HMAC approach. Completes the three-layer GOOSE story: relay MAC block
-(15) → relay trip filter (16) → asset MAC validation (17).
+The ladder currently ends at brief 17 (goose-sa).
 
 ---
 
@@ -35,24 +12,32 @@ OPC-UA (port 4840) is the dominant data exchange protocol in European manufactur
 and process industry. It has three security modes (None, Sign, SignAndEncrypt) and
 three authentication methods (anonymous, username, certificate). A small ladder:
 
-**Brief N: OPC-UA port block**
+**Brief 18: OPC-UA port block**
 Direct analogue of brief 12. Block TCP 4840 from the probe; client connects.
-Requires `asyncua` (pure Python) on asset, probe, and client. Check Alpine
-wheel availability first — `asyncua` is pure Python and should be fine.
 
-**Brief N+1: OPC-UA anonymous block**
+**Brief 19: OPC-UA anonymous block**
 Server requires at minimum username/password authentication. The probe's anonymous
 session is rejected at the application layer; the client connects with credentials.
 Boundary transparent. Same `asset.sh` toggle pattern as briefs 11 and 14.
 
-**Brief N+2: OPC-UA security policy**
+**Brief 20: OPC-UA security policy**
 Server requires `Basic256Sha256` signing (rejects `None` policy). The probe
 connects with security policy None → server rejects. Client connects with Sign →
 server accepts. Teaches that OPC-UA's security policy is negotiated at session
 establishment, not enforced at the network layer.
 
-**Implementation note:** verify `asyncua` builds on Alpine before committing to
-this track. If it does, add it to asset/probe/client Dockerfiles alongside the
+**Library:** `asyncua` installs cleanly on Alpine via musllinux_1_2 wheels — no
+source builds needed. Its two C-extension dependencies (`cryptography>=48,<49`
+and `cffi 2.0`) both ship musllinux wheels. Total wheel weight ~8 MB (mostly
+`cryptography`). Pin `cryptography>=48,<49` to avoid a surprise if a future
+major bump lands without a musllinux wheel on day one.
+
+`asyncua` is pure Python on top; the compiled layer is only `cryptography`/`cffi`.
+This is the case where the minimal-protocol-implementation policy correctly admits
+a library: OPC-UA Binary (NodeIds, ExtensionObjects, variant types) is
+disproportionately complex to hand-roll for what the briefs teach. Use `asyncua`
+on both asset and probe/client so the shared-primitive property holds through the
+library itself. Add it to asset, probe, and client Dockerfiles alongside the
 existing dependencies.
 
 ---
@@ -71,10 +56,9 @@ Modbus or IEC 104 checks.
 
 ## Notes on sequencing
 
-The GOOSE extension (16–17) is the lowest-friction next step: the infrastructure
-is in place and the pattern is established.
-OPC-UA is the largest new addition — worth checking `asyncua` on Alpine first.
-Rate limiting is protocol-agnostic and can be inserted anywhere in the ladder.
+OPC-UA is the natural next track — Alpine compatibility confirmed, no glibc
+divergence, no compile step. Rate limiting is protocol-agnostic and can be
+inserted anywhere.
 
-All briefs involving `asset.sh` state (GOOSE SA, OPC-UA auth) share
-the rebuild caveat: re-activate the component after `./lab down && ./lab up`.
+All briefs involving `asset.sh` state (OPC-UA auth, etc.) share the rebuild
+caveat: re-activate the component after `./lab down && ./lab up`.

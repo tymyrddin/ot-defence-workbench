@@ -5,11 +5,42 @@ set -e
 #   client 10.0.1.10   probe 10.0.1.20   asset 10.0.2.10
 
 iptables -F FORWARD
+iptables -t nat -F PREROUTING
+iptables -t nat -F POSTROUTING
 iptables -P FORWARD ACCEPT
 
-# Block probe's GOOSE at the Layer 2 relay.
-# GOOSE has no IP header; filtering is MAC-based. Discover the probe's
-# MAC via ARP (ping to populate the neighbour table first).
-ping -c 2 -W 1 10.0.1.20 >/dev/null 2>&1 || true
-PROBE_MAC=$(ip neigh show 10.0.1.20 | awk 'NR==1{print $5}')
-echo "${PROBE_MAC:-aa:c1:ab:fc:51:6b}" > /tmp/goose-blocked
+# Discover probe MAC: send a UDP datagram to trigger kernel ARP resolution,
+# then read the neighbour table from /proc/net/arp. Retried up to 5 times.
+PROBE_MAC=$(python3 - <<'PYEOF'
+import socket, time, sys
+
+for _ in range(5):
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.5)
+        s.connect(('10.0.1.20', 9))
+        s.send(b'\x00')
+        s.close()
+    except Exception:
+        pass
+    time.sleep(0.4)
+    try:
+        with open('/proc/net/arp') as f:
+            for line in f:
+                parts = line.split()
+                if (len(parts) >= 4 and parts[0] == '10.0.1.20'
+                        and parts[3] != '00:00:00:00:00:00'):
+                    print(parts[3])
+                    sys.exit(0)
+    except Exception:
+        pass
+
+sys.exit(1)
+PYEOF
+)
+
+if [ -z "$PROBE_MAC" ]; then
+    echo "goose-block-probe: could not resolve probe MAC, block not set" >&2
+    exit 1
+fi
+echo "$PROBE_MAC" > /tmp/goose-blocked
